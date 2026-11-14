@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.21.0";
+  const APP_VERSION = "1.21.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2167,7 +2167,7 @@
     els.savingsHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
+        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
         <th class="actions-col"></th>
       </tr>
     `;
@@ -2216,7 +2216,7 @@
     els.brokerIncomeHead.innerHTML = `
       <tr>
         <th><span class="col-title">Доход</span></th>
-        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
+        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
         <th class="actions-col"></th>
       </tr>
     `;
@@ -2232,7 +2232,7 @@
           const cell = month.editable
             ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
             : readCell(shown);
-          return `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${cell}</td>`;
+          return `<td class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}">${cell}</td>`;
         }).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
       `;
@@ -2358,7 +2358,7 @@
       <tr>
         <th><span class="col-title">Строка</span></th>
         <th class="num plan-col"><span class="col-title">${escapeAttr(monthChip(compareKey))}</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(inputKey))}</span></th>
+        <th class="num is-entry"><span class="col-title">${escapeAttr(monthChip(inputKey))}</span></th>
         <th class="num"><span class="col-title">Разница</span></th>
         <th class="num"><span class="col-title">%</span></th>
       </tr>
@@ -2376,7 +2376,7 @@
       tr.innerHTML = `
         <td>${utilityNameCell(title)}</td>
         <td class="num plan-col">${readCell(view.prevText)}</td>
-        <td class="num">${currentCell}</td>
+        <td class="num is-entry">${currentCell}</td>
         <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
         <td class="num">${readCell(view.percentText, view.percentTone)}</td>
       `;

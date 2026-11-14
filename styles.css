@@ -993,6 +993,20 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 
 .savings-table th.num .col-title {
   font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.expense-panel #brokerIncomeTable th.num .col-title,
+.expense-panel .utilities-table th.num .col-title {
+  font-weight: 500;
+}
+
+.savings-table th.is-entry .col-title,
+.expense-panel #brokerIncomeTable th.num.is-entry .col-title,
+.expense-panel .utilities-table th.num.is-entry .col-title,
+.expense-panel #brokerIncomeTable td.is-entry input,
+.expense-panel .utilities-table td.is-entry input {
   font-weight: 700;
   color: var(--ink);
 }
