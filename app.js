@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.5.1";
+  const APP_VERSION = "1.6.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -377,18 +377,33 @@
     return next;
   }
 
-  // Вкладка «Бюджет_2026», блок «ноябрь»: план и разложение по ЗП ноября и авансу декабря.
+  // Вкладка «Бюджет_2026»: колонки «ЗП октябрь» и «Аванс ноябрь» — это ноябрь в приложении.
   const SHEET_NOVEMBER_COSTS = [
-    { name: "отложить", plan: 60000, salary: null, advance: 60000 },
+    { name: "отложить", plan: 141500, salary: 36468, advance: 105032 },
     { name: "жили были", plan: 60000, salary: 30000, advance: 30000 },
     { name: "ипотека", plan: 38000, salary: 38000, advance: null },
     { name: "инет, связи", plan: 2500, salary: 2500, advance: null },
     { name: "комуналка", plan: 22000, salary: 22000, advance: null },
-    { name: "покупки", plan: 5000, salary: null, advance: 5000 },
-    { name: "отдых", plan: 5000, salary: null, advance: 5000 },
+    { name: "покупки", plan: 10000, salary: 5000, advance: 5000 },
+    { name: "отдых", plan: 13000, salary: 6500, advance: 6500 },
     { name: "бензин", plan: 10000, salary: 5000, advance: 5000 },
-    { name: "баня", plan: 6200, salary: 1200, advance: 5000 },
-    { name: "отпуск", plan: null, salary: null, advance: null },
+    { name: "баня", plan: 10000, salary: 5000, advance: 5000 },
+    { name: "дети", plan: 12000, salary: 6000, advance: 6000 },
+    { name: "карина др", plan: 8000, salary: 8000, advance: null },
+    { name: "бассей", plan: 2000, salary: null, advance: 2000 },
+  ];
+
+  // Эти суммы относятся к декабрю и были записаны в него по ошибке.
+  const SHEET_DECEMBER_MISTAKE = [
+    { name: "отложить", salary: null, advance: 60000 },
+    { name: "жили были", salary: 30000, advance: 30000 },
+    { name: "ипотека", salary: 38000, advance: null },
+    { name: "инет, связи", salary: 2500, advance: null },
+    { name: "комуналка", salary: 22000, advance: null },
+    { name: "покупки", salary: null, advance: 5000 },
+    { name: "отдых", salary: null, advance: 5000 },
+    { name: "бензин", salary: 5000, advance: 5000 },
+    { name: "баня", salary: 1200, advance: 5000 },
   ];
 
   function expenseNameKey(name) {
@@ -399,17 +414,16 @@
       .replace(/\s+/g, " ");
   }
 
-  function applySheetNovemberCosts(target) {
-    if (target.sheetNovemberCosts) return false;
-    const month = target.years?.[2026]?.months?.["2026-12"];
-    if (!month?.expenses) return false;
-    const byName = new Map(SHEET_NOVEMBER_COSTS.map((row) => [row.name, row]));
+  function writeCostShares(month, specs, { plans = false } = {}) {
+    const byName = new Map(specs.map((row) => [row.name, row]));
     month.expenses.forEach((row) => {
       normalizeExpense(row);
       const spec = byName.get(expenseNameKey(row.name));
       if (!spec) return;
-      row.plan = spec.plan;
-      row.planManual = spec.plan != null;
+      if (plans) {
+        row.plan = spec.plan;
+        row.planManual = spec.plan != null;
+      }
       ["salary", "advance"].forEach((key) => {
         if (spec[key] == null) {
           delete row.shares[key];
@@ -420,7 +434,34 @@
         }
       });
     });
-    target.sheetNovemberCosts = true;
+  }
+
+  function undoDecemberCostMistake(month) {
+    const byName = new Map(SHEET_DECEMBER_MISTAKE.map((row) => [row.name, row]));
+    month.expenses.forEach((row) => {
+      normalizeExpense(row);
+      const spec = byName.get(expenseNameKey(row.name));
+      if (!spec) return;
+      ["salary", "advance"].forEach((key) => {
+        const written = spec[key];
+        if (written == null) return;
+        if (Number(row.shares[key]) !== written) return;
+        delete row.shares[key];
+        delete row.sharesManual[key];
+      });
+    });
+  }
+
+  function applySheetNovemberCosts(target) {
+    if (target.sheetNovemberCosts === "2026-11") return false;
+    const november = target.years?.[2026]?.months?.["2026-11"];
+    if (!november?.expenses) return false;
+    if (target.sheetNovemberCosts === true) {
+      const december = target.years?.[2026]?.months?.["2026-12"];
+      if (december?.expenses) undoDecemberCostMistake(december);
+    }
+    writeCostShares(november, SHEET_NOVEMBER_COSTS, { plans: true });
+    target.sheetNovemberCosts = "2026-11";
     return true;
   }
 
@@ -1339,6 +1380,7 @@
     month.expenses.forEach((row, index) => {
       normalizeExpense(row);
       const tr = document.createElement("tr");
+      tr.dataset.exp = row.id;
       if (animateRows) {
         tr.classList.add("row-in");
         tr.style.animationDelay = `${Math.min(index, 12) * 0.04}s`;
@@ -1432,6 +1474,33 @@
     });
   }
 
+  function enteredRowSum(row) {
+    normalizeExpense(row);
+    return Object.keys(row.shares || {}).reduce(
+      (sum, key) => sum + (cellValue(row, key) || 0),
+      0
+    );
+  }
+
+  function planIsShort(row) {
+    const plan = cellValue(row, "plan");
+    if (plan == null) return false;
+    return Math.round(enteredRowSum(row) * 100) < Math.round(plan * 100);
+  }
+
+  function paintPlanShortfalls(month) {
+    month.expenses.forEach((row) => {
+      const input = document.querySelector(
+        `#expenseBody tr[data-exp="${CSS.escape(row.id)}"] input[data-key="plan"]`
+      );
+      if (!input) return;
+      const short = planIsShort(row);
+      input.classList.toggle("plan-short", short);
+      if (short) input.title = "По строке введено меньше плана";
+      else input.removeAttribute("title");
+    });
+  }
+
   function refreshTotalsOnly() {
     const month = activeMonth();
     const t = totals(month);
@@ -1450,6 +1519,7 @@
       const left = document.querySelector(`#expenseFoot [data-remain-id="${CSS.escape(row.id)}"]`);
       paintRemain(left, amount - columnSum(month, incomeColumnKey(row)));
     });
+    paintPlanShortfalls(month);
   }
 
   function paintRemain(node, value) {
