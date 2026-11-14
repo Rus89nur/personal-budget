@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.20.2";
+  const APP_VERSION = "1.20.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2140,10 +2140,10 @@
 
   function savingsNameCell(row) {
     if (row.id === "earned") {
-      return `<span class="savings-label">Заработал в месяц <span class="savings-mark">пассив</span></span>`;
+      return `<span class="savings-label">Заработал в месяц пассив</span>`;
     }
     if (row.id === "topup") {
-      return `<span class="savings-label savings-mark">Пополнил БС</span>`;
+      return `<span class="savings-label">Пополнил БС</span>`;
     }
     if (row.calc) return nameCell(row.name);
     return `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
@@ -2175,6 +2175,7 @@
     savingsLines().forEach((row) => {
       const tr = document.createElement("tr");
       if (row.calc) tr.classList.add("is-total");
+      if (row.id === "earned" || row.id === "topup") tr.classList.add("is-savings-mark");
       const action = row.calc
         ? ""
         : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`;

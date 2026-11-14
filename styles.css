@@ -1324,7 +1324,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   line-height: 1.2;
 }
 
-.savings-table .savings-mark {
+.savings-table tr.is-savings-mark .savings-label,
+.savings-table tr.is-savings-mark .num-input {
   color: var(--income);
   font-weight: 650;
 }
