@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.9.2";
+  const APP_VERSION = "1.9.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1859,7 +1859,7 @@
     els.savingsHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        ${months.map((month) => `<th class="num"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
+        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
       </tr>
     `;
     els.savingsBody.innerHTML = "";
@@ -1868,7 +1868,7 @@
       if (row.calc) tr.classList.add("is-total");
       tr.innerHTML = `
         <td>${nameCell(row.name)}</td>
-        ${months.map((month) => `<td class="num">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
+        ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
       `;
       tr.querySelectorAll("input:not([readonly])").forEach((input) => {
         input.addEventListener("change", () => {
@@ -1983,7 +1983,7 @@
     els.utilitiesHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(compareKey))}</span></th>
+        <th class="num plan-col"><span class="col-title">${escapeAttr(monthChip(compareKey))}</span></th>
         <th class="num"><span class="col-title">${escapeAttr(monthChip(inputKey))}</span></th>
         <th class="num"><span class="col-title">Разница</span></th>
         <th class="num"><span class="col-title">%</span></th>
@@ -2001,7 +2001,7 @@
         : readCell(view.currentText);
       tr.innerHTML = `
         <td>${utilityNameCell(title)}</td>
-        <td class="num">${readCell(view.prevText)}</td>
+        <td class="num plan-col">${readCell(view.prevText)}</td>
         <td class="num">${currentCell}</td>
         <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
         <td class="num">${readCell(view.percentText, view.percentTone)}</td>
