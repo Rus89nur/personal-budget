@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.9";
+  const APP_VERSION = "1.9.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1965,23 +1965,23 @@
 
   function renderUtilities() {
     if (!els.utilitiesHead || !els.utilitiesBody || !state.utilities) return;
-    const key = state.currentMonth;
-    const prevKey = previousMonthKey(key);
+    const inputKey = previousMonthKey(state.currentMonth);
+    const compareKey = previousMonthKey(inputKey);
     els.utilitiesHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(prevKey))}</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(key))}</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(compareKey))}</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(inputKey))}</span></th>
         <th class="num"><span class="col-title">Разница</span></th>
         <th class="num"><span class="col-title">%</span></th>
       </tr>
     `;
     els.utilitiesBody.innerHTML = "";
-    const paintRow = (title, currentOf, editableId) => {
+    const paintRow = (title, valueOf, editableId) => {
       const tr = document.createElement("tr");
       if (!editableId) tr.classList.add("is-total");
-      const current = currentOf(key);
-      const previous = currentOf(prevKey);
+      const current = valueOf(inputKey);
+      const previous = valueOf(compareKey);
       const view = compareView(current, previous);
       const currentCell = editableId
         ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
@@ -1998,8 +1998,8 @@
         input.addEventListener("change", () => {
           const parsed = parseNumber(input.value);
           if (!state.utilities.rows[editableId]) state.utilities.rows[editableId] = {};
-          if (parsed == null) delete state.utilities.rows[editableId][key];
-          else state.utilities.rows[editableId][key] = parsed;
+          if (parsed == null) delete state.utilities.rows[editableId][inputKey];
+          else state.utilities.rows[editableId][inputKey] = parsed;
           saveState();
           renderUtilities();
         });
