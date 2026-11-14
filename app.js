@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.2.3";
+  const APP_VERSION = "1.2.4";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -149,7 +149,7 @@
     const cal = BudgetCalendar.parts(year, index);
     const prev = month.workdays || {};
     const partial = Boolean(prev.partialChosen);
-    const vacationOn = prev.vacationOn != null ? Boolean(prev.vacationOn) : Number(prev.vacation) > 0;
+    const vacationOn = Boolean(prev.vacationOn);
     month.workdays = {
       total: cal.total,
       calendarFirst: cal.first,
@@ -968,6 +968,16 @@
       delete state.needsPayroll;
       saveState();
     }
+    let droppedVacation = false;
+    YEARS.forEach((year) => {
+      Object.values(state.years[year].months).forEach((month) => {
+        if (month.workdays?.vacationOn) return;
+        const before = month.income.length;
+        month.income = month.income.filter((row) => !isVacationLabel(row.label));
+        if (month.income.length !== before) droppedVacation = true;
+      });
+    });
+    if (droppedVacation) saveState();
     render();
   }
 
