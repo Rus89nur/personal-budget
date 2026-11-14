@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.20.0";
+  const APP_VERSION = "1.20.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1925,7 +1925,7 @@
     { id: "flat2", name: "Квартира 2" },
     { id: "garage", name: "Гараж" },
     { id: "own", name: "Вложил свои", calc: "own" },
-    { id: "earned", name: "Заработал в месяц (пасив)", calc: "earned" },
+    { id: "earned", name: "Заработал в месяц", calc: "earned" },
     { id: "topup", name: "Пополнил БС", calc: "topup" },
     { id: "delta", name: "Прирост", calc: "delta" },
   ];
@@ -2000,8 +2000,8 @@
     const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id));
     const own = rest.find((row) => row.id === "own");
     if (own) own.calc = "own";
-    const earned = byId.earned || { id: "earned", name: "Заработал в месяц (пасив)", calc: "earned" };
-    earned.name = "Заработал в месяц (пасив)";
+    const earned = byId.earned || { id: "earned", name: "Заработал в месяц", calc: "earned" };
+    earned.name = "Заработал в месяц";
     earned.calc = "earned";
     const topup = byId.topup || { id: "topup", name: "Пополнил БС", calc: "topup" };
     topup.name = topup.name || "Пополнил БС";
@@ -2138,6 +2138,17 @@
     return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
   }
 
+  function savingsNameCell(row) {
+    if (row.id === "earned") {
+      return `<span class="savings-label">Заработал в месяц <span class="savings-mark">пассив</span></span>`;
+    }
+    if (row.id === "topup") {
+      return `<span class="savings-label savings-mark">Пополнил БС</span>`;
+    }
+    if (row.calc) return nameCell(row.name);
+    return `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
+  }
+
   function savingsCell(row, monthKey, editable) {
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
@@ -2163,16 +2174,12 @@
     els.savingsBody.innerHTML = "";
     savingsLines().forEach((row) => {
       const tr = document.createElement("tr");
-      if (row.id === "earned" || row.id === "topup") tr.classList.add("is-savings-hot");
-      else if (row.calc) tr.classList.add("is-total");
-      const name = row.calc
-        ? nameCell(row.name)
-        : `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
+      if (row.calc) tr.classList.add("is-total");
       const action = row.calc
         ? ""
         : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`;
       tr.innerHTML = `
-        <td>${name}</td>
+        <td>${savingsNameCell(row)}</td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
         <td class="actions-col">${action}</td>
       `;

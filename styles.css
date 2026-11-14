@@ -1309,16 +1309,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   color: var(--ink-soft);
 }
 
-.expense-panel .savings-table tbody tr.is-savings-hot td,
-.expense-panel .savings-table tbody tr.is-savings-hot:hover td {
-  background: rgba(31, 77, 74, 0.06);
+.savings-table .savings-label {
+  display: block;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.2;
 }
 
-.expense-panel .savings-table tbody tr.is-savings-hot input,
-.expense-panel .savings-table tbody tr.is-savings-hot:hover input,
-.expense-panel .savings-table tbody tr.is-savings-hot input:focus {
-  background: transparent;
-  color: var(--ink);
+.savings-table .savings-mark {
+  color: var(--income);
   font-weight: 650;
 }
 
