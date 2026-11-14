@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.16.0";
+  const APP_VERSION = "1.17.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -94,6 +94,7 @@
 
   let seedTemplate = null;
   let sheetBudget = null;
+  let sheetSavings = null;
   let state = null;
   let settingsDraftOklad = null;
   let rentMenuKey = null;
@@ -654,6 +655,24 @@
     });
     ensureTitheStructure(target);
     target.sheetBudgetThrough = "2026-10";
+    return true;
+  }
+
+  function applySheetSavings(target, sheet) {
+    if (!sheet || target.sheetSavingsFact === "fact") return false;
+    if (!target.savingsFact?.rows) return false;
+    Object.entries(sheet.rows || {}).forEach(([id, amounts]) => {
+      if (!amounts || typeof amounts !== "object") return;
+      target.savingsFact.rows[id] = { ...amounts };
+    });
+    if (Array.isArray(sheet.brokerIncomes)) {
+      target.savingsFact.brokerIncomes = sheet.brokerIncomes.map((row) => ({
+        id: row.id,
+        name: String(row.name || "Доход"),
+        amounts: { ...(row.amounts || {}) },
+      }));
+    }
+    target.sheetSavingsFact = "fact";
     return true;
   }
 
@@ -2911,8 +2930,11 @@
     if (!confirm("Вернуть все месяцы к цифрам из таблицы Бюджет_2026?")) return;
     state = buildStateFromSeed(seedTemplate, true);
     delete state.sheetBudgetThrough;
+    delete state.sheetSavingsFact;
     delete state.needsPayroll;
     applySheetBudget(state, sheetBudget);
+    ensureSavingsFact(state);
+    applySheetSavings(state, sheetSavings);
     saveState();
     render();
   }
@@ -3045,13 +3067,15 @@
   async function boot() {
     clearStaleCaches();
     try {
-      const [seedRes, sheetRes] = await Promise.all([
+      const [seedRes, sheetRes, savingsRes] = await Promise.all([
         fetch(`./seed-data.json?v=${APP_VERSION}`, { cache: "no-store" }),
         fetch(`./sheet-budget-2026.json?v=${APP_VERSION}`, { cache: "no-store" }),
+        fetch(`./sheet-savings-2026.json?v=${APP_VERSION}`, { cache: "no-store" }),
       ]);
       if (!seedRes.ok) throw new Error("seed missing");
       seedTemplate = await seedRes.json();
       if (sheetRes.ok) sheetBudget = await sheetRes.json();
+      if (savingsRes.ok) sheetSavings = await savingsRes.json();
     } catch {
       seedTemplate = { version: 3, year: state?.year || 2026, months: {} };
     }
@@ -3073,7 +3097,9 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || ensureSavingsFact(state) || ensureUtilities(state)) saveState();
+    const savingsReady = ensureSavingsFact(state);
+    const savingsApplied = applySheetSavings(state, sheetSavings);
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || savingsReady || savingsApplied || ensureUtilities(state)) saveState();
     render();
   }
 
