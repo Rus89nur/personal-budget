@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.13.4";
+  const APP_VERSION = "1.13.5";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1348,13 +1348,16 @@
       });
       els.monthNav.appendChild(btn);
     });
-    requestAnimationFrame(() => {
-      els.monthNav?.querySelector(".month-chip.active")?.scrollIntoView({
-        inline: "center",
-        block: "nearest",
-        behavior: "auto",
-      });
-    });
+    requestAnimationFrame(() => scrollActiveMonthIntoView("auto"));
+  }
+
+  function scrollActiveMonthIntoView(behavior = "smooth") {
+    const nav = els.monthNav;
+    const active = nav?.querySelector(".month-chip.active");
+    if (!nav || !active) return;
+    // На телефоне сетка без скролла: scrollIntoView сдвигает всю страницу.
+    if (nav.scrollWidth <= nav.clientWidth + 2) return;
+    active.scrollIntoView({ inline: "center", block: "nearest", behavior });
   }
 
   function unlockPayroll(month, kinds) {
@@ -2654,7 +2657,7 @@
       [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
         markFresh(selector, index);
       });
-      els.monthNav?.querySelector(".month-chip.active")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      scrollActiveMonthIntoView("smooth");
     }
   }
 
