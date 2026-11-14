@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.6.2";
+  const APP_VERSION = "1.6.4";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -50,6 +50,8 @@
     expenseHead: document.getElementById("expenseHead"),
     btnAddIncome: document.getElementById("btnAddIncome"),
     btnAddExpense: document.getElementById("btnAddExpense"),
+    btnClearExpenses: document.getElementById("btnClearExpenses"),
+    btnFillExpenses: document.getElementById("btnFillExpenses"),
     btnExport: document.getElementById("btnExport"),
     importFile: document.getElementById("importFile"),
     btnReset: document.getElementById("btnReset"),
@@ -1343,6 +1345,42 @@
     }
   }
 
+  function expenseColumnKeys(month) {
+    return ["plan", ...incomeColumns(month).map((col) => col.key)];
+  }
+
+  function fillExpensesFromPrevious(onlyKey) {
+    const month = activeMonth();
+    const keys = onlyKey ? [onlyKey] : expenseColumnKeys(month);
+    let changed = false;
+    month.expenses.forEach((row) => {
+      normalizeExpense(row);
+      keys.forEach((key) => {
+        if (cellValue(row, key) != null) return;
+        const suggested = suggestionFor(row, key);
+        if (suggested == null) return;
+        writeExpenseCell(row, key, suggested);
+        changed = true;
+      });
+    });
+    if (!changed) return;
+    state.seeded = false;
+    saveState();
+    render();
+  }
+
+  function clearAllExpenses() {
+    const month = activeMonth();
+    month.expenses.forEach((row) => {
+      normalizeExpense(row);
+      writeExpenseCell(row, "plan", null);
+      Object.keys(row.shares || {}).forEach((key) => writeExpenseCell(row, key, null));
+    });
+    state.seeded = false;
+    saveState();
+    render();
+  }
+
   function renderExpenses(month) {
     const columns = incomeColumns(month);
     const incomeTotal = month.income.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
@@ -1355,8 +1393,10 @@
         </th>
         ${columns.map((col) => `
           <th class="num">
-            <span class="col-title">${escapeAttr(col.label)}</span>
-            <span class="col-sum" data-income-id="${escapeAttr(col.id)}">${money(col.amount)}</span>
+            <button type="button" class="col-fill" data-fill-key="${escapeAttr(col.key)}" title="Заполнить столбец из прошлого месяца">
+              <span class="col-title">${escapeAttr(col.label)}</span>
+              <span class="col-sum" data-income-id="${escapeAttr(col.id)}">${money(col.amount)}</span>
+            </button>
           </th>
         `).join("")}
         <th class="actions-col"></th>
@@ -1646,6 +1686,19 @@
     state.seeded = false;
     saveState();
     render();
+  });
+
+  els.expenseHead.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-fill-key]");
+    if (!button) return;
+    fillExpensesFromPrevious(button.dataset.fillKey);
+  });
+
+  els.btnFillExpenses.addEventListener("click", () => fillExpensesFromPrevious());
+
+  els.btnClearExpenses.addEventListener("click", () => {
+    if (!confirm("Очистить все суммы расходов этого месяца?")) return;
+    clearAllExpenses();
   });
 
   els.btnAddExpense.addEventListener("click", () => {
