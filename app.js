@@ -46,6 +46,7 @@
     settingsOklad: document.getElementById("settingsOklad"),
     regionalAmount: document.getElementById("regionalAmount"),
     northernAmount: document.getElementById("northernAmount"),
+    basePayAmount: document.getElementById("basePayAmount"),
     grossAmount: document.getElementById("grossAmount"),
     netAmount: document.getElementById("netAmount"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
@@ -350,6 +351,7 @@
     const calc = Salary.calculateFromOklad(oklad);
     els.regionalAmount.textContent = money(lineAmount(calc, "regional"));
     els.northernAmount.textContent = money(lineAmount(calc, "northern"));
+    els.basePayAmount.textContent = money(lineAmount(calc, "basePay"));
     els.grossAmount.textContent = money(calc.grossTaxable);
     els.netAmount.textContent = money(calc.net);
   }
@@ -364,6 +366,7 @@
       console.error(err);
       els.regionalAmount.textContent = "—";
       els.northernAmount.textContent = "—";
+      els.basePayAmount.textContent = "—";
       els.grossAmount.textContent = "—";
       els.netAmount.textContent = "—";
     }
