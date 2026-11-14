@@ -19,6 +19,9 @@
     <h1 class="hero-brand">Бюджет 2026</h1>
     <p class="hero-lead">Рабочие дни, ЗП и аванс, пассив, категории расходов и остаток — по месяцам.</p>
     <div class="hero-actions">
+      <button type="button" class="btn btn-primary" id="btnSettings" title="Оклад и расчёт ЗП">
+        <span class="gear" aria-hidden="true">⚙</span> Настройки
+      </button>
       <button type="button" class="btn btn-ghost" id="btnExport" title="Скачать JSON">Экспорт</button>
       <label class="btn btn-ghost file-btn" title="Загрузить JSON">
         Импорт
@@ -144,6 +147,31 @@
     <p>Бюджет 2026 · хранится в localStorage этого устройства · GitHub Pages</p>
   </footer>
 
+  <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="settings-sheet" id="settingsForm">
+      <header class="settings-head">
+        <div>
+          <h2 id="settingsTitle">Настройки зарплаты</h2>
+          <p>Только оклад можно менять — остальное считается как на листе «ЗП».</p>
+        </div>
+        <button type="button" class="icon-x" id="btnSettingsClose" aria-label="Закрыть">×</button>
+      </header>
+
+      <label class="field settings-oklad">
+        <span>Оклад</span>
+        <input type="text" inputmode="decimal" id="settingsOklad" name="oklad" autocomplete="off" />
+      </label>
+
+      <div class="settings-calc" id="settingsCalc" aria-live="polite"></div>
+
+      <footer class="settings-foot">
+        <button type="button" class="btn btn-ghost" id="btnSettingsCancel">Отмена</button>
+        <button type="button" class="btn btn-primary" id="btnSettingsSave">Сохранить</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <script src="salary.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

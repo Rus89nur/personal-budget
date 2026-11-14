@@ -1235,7 +1235,9 @@
     }
   },
   "salary": {
-    "netMonthly": 329000,
+    "oklad": 85536,
+    "netMonthly": 324641,
+    "netRounded": 329000,
     "advanceShare": 0.46,
     "salaryShare": 0.54,
     "advance": 149335,

@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "personal-budget-v2";
   const YEAR = 2026;
+  const Salary = window.BudgetSalary;
 
   const MONTHS_RU = [
     "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -10,6 +11,11 @@
   const MONTHS_SHORT = [
     "янв", "фев", "мар", "апр", "май", "июн",
     "июл", "авг", "сен", "окт", "ноя", "дек",
+  ];
+
+  const MONTH_GENITIVE = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
   ];
 
   const els = {
@@ -34,10 +40,18 @@
     btnExport: document.getElementById("btnExport"),
     importFile: document.getElementById("importFile"),
     btnReset: document.getElementById("btnReset"),
+    btnSettings: document.getElementById("btnSettings"),
+    settingsDialog: document.getElementById("settingsDialog"),
+    settingsForm: document.getElementById("settingsForm"),
+    settingsOklad: document.getElementById("settingsOklad"),
+    settingsCalc: document.getElementById("settingsCalc"),
+    btnSettingsCancel: document.getElementById("btnSettingsCancel"),
+    btnSettingsSave: document.getElementById("btnSettingsSave"),
   };
 
   let seedTemplate = null;
   let state = null;
+  let settingsDraftOklad = null;
 
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -110,12 +124,19 @@
     return `${YEAR}-01`;
   }
 
+  function defaultOklad(seed) {
+    const fromSeed = Number(seed?.salary?.oklad);
+    if (Number.isFinite(fromSeed) && fromSeed > 0) return fromSeed;
+    return Salary.DEFAULT_OKLAD;
+  }
+
   function buildStateFromSeed(seed, seeded = true) {
     return {
       version: 2,
       year: YEAR,
       currentMonth: currentMonthKey(),
       seeded,
+      oklad: defaultOklad(seed),
       months: cloneSeedMonths(seed),
       savedAt: new Date().toISOString(),
     };
@@ -135,9 +156,99 @@
       if (!monthKeys().includes(parsed.currentMonth)) {
         parsed.currentMonth = currentMonthKey();
       }
+      if (!Number.isFinite(Number(parsed.oklad)) || Number(parsed.oklad) <= 0) {
+        parsed.oklad = defaultOklad(seed);
+      }
       return parsed;
     } catch {
       return buildStateFromSeed(seed, true);
+    }
+  }
+
+  function isAdvanceLabel(label) {
+    // \b не работает с кириллицей — якорим пробелом/концом строки
+    return /^аванс(?=$|\s|[(\[]|[-–—])/i.test(String(label || "").trim());
+  }
+
+  function isSalaryLabel(label) {
+    const text = String(label || "").trim();
+    if (/^13/i.test(text)) return false;
+    if (/13-?\s*я/i.test(text)) return false;
+    return /^зп(?=$|\s|[(\[]|[-–—])/i.test(text);
+  }
+
+  /** Убрать дубли ЗП/Аванс, оставить по одной строке каждого вида */
+  function dedupePayrollRows(month) {
+    let seenSalary = false;
+    let seenAdvance = false;
+    month.income = month.income.filter((row) => {
+      if (isSalaryLabel(row.label)) {
+        if (seenSalary) return false;
+        seenSalary = true;
+        return true;
+      }
+      if (isAdvanceLabel(row.label)) {
+        if (seenAdvance) return false;
+        seenAdvance = true;
+        return true;
+      }
+      return true;
+    });
+  }
+
+  function ensureIncomeRow(month, kind, label) {
+    const match =
+      kind === "advance"
+        ? month.income.find((r) => isAdvanceLabel(r.label))
+        : month.income.find((r) => isSalaryLabel(r.label));
+    if (match) {
+      match.label = label;
+      return match;
+    }
+    const row = { id: uid("inc"), label, amount: 0 };
+    const insertAt = kind === "salary" ? 0 : month.income.findIndex((r) => !isSalaryLabel(r.label));
+    if (insertAt < 0) month.income.push(row);
+    else month.income.splice(insertAt, 0, row);
+    return row;
+  }
+
+  /**
+   * Обновляет строки «ЗП» / «Аванс» во всех месяцах по окладу и рабочим дням.
+   * Аванс месяца M — от factor(M); ЗП в месяце M — от factor(M−1) (ЗП прошлого месяца).
+   */
+  function applySalaryToMonths(target = state, { silent = false } = {}) {
+    if (!target?.months) return;
+    const calc = Salary.calculateFromOklad(target.oklad);
+    const keys = monthKeys();
+
+    keys.forEach((key, index) => {
+      const month = target.months[key];
+      if (!month) return;
+
+      dedupePayrollRows(month);
+
+      const advancePay = Salary.scalePay(calc, Salary.workFactor(month.workdays));
+      const prevKey = index > 0 ? keys[index - 1] : null;
+      const prevFactor = prevKey
+        ? Salary.workFactor(target.months[prevKey]?.workdays)
+        : 1;
+      const salaryPay = Salary.scalePay(calc, prevFactor);
+
+      const advanceLabel = `Аванс ${MONTH_GENITIVE[index]}`;
+      const salaryLabel =
+        index === 0 ? "ЗП декабря" : `ЗП ${MONTH_GENITIVE[index - 1]}`;
+
+      const salaryRow = ensureIncomeRow(month, "salary", salaryLabel);
+      salaryRow.amount = salaryPay.salary;
+
+      const advanceRow = ensureIncomeRow(month, "advance", advanceLabel);
+      advanceRow.amount = advancePay.advance;
+
+      dedupePayrollRows(month);
+    });
+
+    if (!silent) {
+      target.seeded = false;
     }
   }
 
@@ -213,41 +324,143 @@
       input.value = value == null ? "" : String(value);
       input.oninput = () => {
         month.workdays[key] = parseNumber(input.value);
-        state.seeded = false;
+        if (key === "total" || key === "worked") {
+          applySalaryToMonths(state);
+        } else {
+          state.seeded = false;
+        }
         saveState();
+        if (key === "total" || key === "worked") {
+          renderIncome(activeMonth());
+          refreshTotalsOnly();
+        }
       };
     });
+  }
+
+  function formatRate(rate) {
+    if (rate == null) return "";
+    const pct = rate * 100;
+    if (Math.abs(pct % 1) < 1e-9) return `${Math.round(pct)}%`;
+    return `${String(Math.round(pct * 10) / 10).replace(".", ",")}%`;
+  }
+
+  function renderSettingsCalc(oklad) {
+    const calc = Salary.calculateFromOklad(oklad);
+    const rows = [];
+
+    calc.lines.forEach((line) => {
+      if (line.key === "oklad") return;
+      rows.push(`
+        <div class="calc-row">
+          <span class="calc-label">${escapeAttr(line.label)}</span>
+          <span class="calc-rate">${formatRate(line.rate)}</span>
+          <span class="calc-amount">${money(line.amount)}</span>
+        </div>
+      `);
+    });
+
+    rows.push(`
+      <div class="calc-row total">
+        <span class="calc-label">Общий облагаемый доход</span>
+        <span class="calc-rate"></span>
+        <span class="calc-amount">${money(calc.grossTaxable)}</span>
+      </div>
+      <div class="calc-row total">
+        <span class="calc-label">После вычета налога (13%)</span>
+        <span class="calc-rate"></span>
+        <span class="calc-amount">${money(calc.net)}</span>
+      </div>
+      <div class="calc-row highlight">
+        <span class="calc-label">Аванс</span>
+        <span class="calc-rate">${calc.advancePct}%</span>
+        <span class="calc-amount">${money(calc.advance)}</span>
+      </div>
+      <div class="calc-row highlight">
+        <span class="calc-label">ЗП</span>
+        <span class="calc-rate">${calc.salaryPct}%</span>
+        <span class="calc-amount">${money(calc.salary)}</span>
+      </div>
+    `);
+
+    els.settingsCalc.innerHTML = rows.join("");
+  }
+
+  function openSettings() {
+    if (!state) return;
+    settingsDraftOklad = state.oklad;
+    els.settingsOklad.value = formatEditable(state.oklad);
+    try {
+      renderSettingsCalc(state.oklad);
+    } catch (err) {
+      console.error(err);
+      els.settingsCalc.innerHTML = `<p class="month-hint">Не удалось посчитать зарплату.</p>`;
+    }
+    if (typeof els.settingsDialog.showModal === "function") {
+      if (!els.settingsDialog.open) els.settingsDialog.showModal();
+    } else {
+      els.settingsDialog.setAttribute("open", "");
+    }
+    queueMicrotask(() => {
+      els.settingsOklad.focus();
+      els.settingsOklad.select();
+    });
+  }
+
+  function closeSettings() {
+    if (typeof els.settingsDialog.close === "function" && els.settingsDialog.open) {
+      els.settingsDialog.close();
+    } else {
+      els.settingsDialog.removeAttribute("open");
+    }
+  }
+
+  function commitSettings() {
+    const parsed = parseNumber(els.settingsOklad.value);
+    if (parsed == null || parsed <= 0) {
+      alert("Укажите корректный оклад.");
+      return false;
+    }
+    state.oklad = parsed;
+    applySalaryToMonths(state);
+    saveState();
+    render();
+    return true;
   }
 
   function renderIncome(month) {
     els.incomeBody.innerHTML = "";
     month.income.forEach((row) => {
+      const payrollLocked = isAdvanceLabel(row.label) || isSalaryLabel(row.label);
       const tr = document.createElement("tr");
+      if (payrollLocked) tr.classList.add("payroll-derived");
       tr.innerHTML = `
-        <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" /></td>
-        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" /></td>
-        <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
+        <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payrollLocked ? "readonly" : ""} /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" ${payrollLocked ? "readonly title=\"Считается из оклада в Настройках\"" : ""} /></td>
+        <td class="actions-col">${payrollLocked ? "" : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`}</td>
       `;
       const labelInput = tr.querySelector('[data-field="label"]');
       const amountInput = tr.querySelector('[data-field="amount"]');
-      labelInput.addEventListener("change", () => {
-        row.label = labelInput.value.trim() || "Прочее";
-        state.seeded = false;
-        saveState();
-      });
-      amountInput.addEventListener("change", () => {
-        row.amount = parseNumber(amountInput.value) || 0;
-        amountInput.value = formatEditable(row.amount);
-        state.seeded = false;
-        saveState();
-        refreshTotalsOnly();
-      });
-      tr.querySelector('[data-act="del"]').addEventListener("click", () => {
-        month.income = month.income.filter((r) => r.id !== row.id);
-        state.seeded = false;
-        saveState();
-        render();
-      });
+      if (!payrollLocked) {
+        labelInput.addEventListener("change", () => {
+          row.label = labelInput.value.trim() || "Прочее";
+          state.seeded = false;
+          saveState();
+        });
+        amountInput.addEventListener("change", () => {
+          row.amount = parseNumber(amountInput.value) || 0;
+          amountInput.value = formatEditable(row.amount);
+          state.seeded = false;
+          saveState();
+          refreshTotalsOnly();
+        });
+        tr.querySelector('[data-act="del"]').addEventListener("click", () => {
+          month.income = month.income.filter((r) => r.id !== row.id);
+          state.seeded = false;
+          saveState();
+          render();
+        });
+      }
       els.incomeBody.appendChild(tr);
     });
   }
@@ -363,6 +576,7 @@
       year: YEAR,
       source: "Бюджет_2026",
       exportedAt: new Date().toISOString(),
+      oklad: state.oklad,
       months: state.months,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -383,6 +597,9 @@
         const months = data.months || data;
         if (!months || typeof months !== "object") throw new Error("bad months");
         const next = buildStateFromSeed({ months }, false);
+        if (Number.isFinite(Number(data.oklad)) && Number(data.oklad) > 0) {
+          next.oklad = Number(data.oklad);
+        }
         for (const key of monthKeys()) {
           if (months[key]) {
             const src = months[key];
@@ -440,6 +657,21 @@
 
   els.btnExport.addEventListener("click", exportData);
   els.btnReset.addEventListener("click", resetFromTable);
+  els.btnSettings.addEventListener("click", openSettings);
+  els.btnSettingsCancel.addEventListener("click", closeSettings);
+  document.getElementById("btnSettingsClose").addEventListener("click", closeSettings);
+  els.btnSettingsSave.addEventListener("click", () => {
+    if (commitSettings()) closeSettings();
+  });
+  els.settingsOklad.addEventListener("input", () => {
+    const parsed = parseNumber(els.settingsOklad.value);
+    settingsDraftOklad = parsed;
+    if (parsed != null && parsed > 0) renderSettingsCalc(parsed);
+  });
+  els.settingsDialog.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeSettings();
+  });
   els.importFile.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) importData(file);
@@ -455,6 +687,9 @@
       seedTemplate = { version: 2, year: YEAR, months: {} };
     }
     state = loadState(seedTemplate);
+    if (!Number.isFinite(Number(state.oklad)) || Number(state.oklad) <= 0) {
+      state.oklad = defaultOklad(seedTemplate);
+    }
     render();
   }
 
