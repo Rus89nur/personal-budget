@@ -29,7 +29,7 @@
 }
 
 html {
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -208,29 +208,14 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   to { opacity: 1; }
 }
 
-.hero-stage {
-  height: 200svh;
-}
-
 .hero {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  height: 100svh;
-  display: grid;
-  color: var(--cream);
-  background: var(--paper);
-}
-
-.hero-frame {
   position: relative;
-  height: 100%;
+  min-height: 78svh;
   display: grid;
   align-items: end;
-  overflow: hidden;
+  color: var(--cream);
   background: #121614;
-  transform-origin: center top;
-  will-change: transform;
+  overflow: hidden;
 }
 
 .hero-scene {
@@ -290,7 +275,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   z-index: 1;
   width: min(var(--max), calc(100% - var(--pad) * 2));
   margin: 0 auto;
-  padding: 7rem 0 18vh;
+  padding: 7rem 0 3.2rem;
 }
 
 .hero-kicker {
@@ -789,13 +774,50 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .expense-panel .data-table {
   border-collapse: separate;
-  border-spacing: 0 0.15rem;
-  min-width: 640px;
+  border-spacing: 0 0.35rem;
+  min-width: 720px;
 }
 
 .expense-panel .data-table th,
 .expense-panel .data-table td {
   border-bottom: none;
+}
+
+.expense-panel .col-title,
+.expense-panel .col-sum {
+  display: block;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.expense-panel .col-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.expense-panel .col-sum {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.expense-panel tbody td {
+  background: transparent;
+  transition: background 0.16s ease;
+}
+
+.expense-panel tbody tr:hover td {
+  background: #fff;
+}
+
+.expense-panel tbody tr:hover td:first-child {
+  border-radius: 14px 0 0 14px;
+}
+
+.expense-panel tbody tr:hover td:last-child {
+  border-radius: 0 14px 14px 0;
 }
 
 .expense-panel .data-table input {
@@ -806,9 +828,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   padding: 0.45rem 0.4rem;
 }
 
-.expense-panel .data-table input:hover,
 .expense-panel .data-table input:focus {
-  background: rgba(255, 255, 255, 0.7);
   outline: none;
 }
 
@@ -844,20 +864,6 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: rgba(31, 77, 74, 0.06);
   color: var(--ink-soft);
   cursor: default;
-}
-
-.deck {
-  position: relative;
-  z-index: 2;
-  margin-top: -100svh;
-}
-
-.screen-sheet {
-  width: min(1180px, calc(100% - 1.25rem));
-  margin: 0 auto 1rem;
-  background: var(--paper);
-  border-radius: 28px;
-  box-shadow: 0 24px 70px rgba(12, 14, 12, 0.16);
 }
 
 .site-foot {

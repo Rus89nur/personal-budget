@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.3.4";
+  const APP_VERSION = "1.3.6";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -41,10 +41,7 @@
     incomeBody: document.getElementById("incomeBody"),
     incomeTotal: document.getElementById("incomeTotal"),
     expenseBody: document.getElementById("expenseBody"),
-    expensePlanTotal: document.getElementById("expensePlanTotal"),
-    expenseSalaryTotal: document.getElementById("expenseSalaryTotal"),
-    expenseAdvanceTotal: document.getElementById("expenseAdvanceTotal"),
-    expenseDeltaTotal: document.getElementById("expenseDeltaTotal"),
+    expenseHead: document.getElementById("expenseHead"),
     btnAddIncome: document.getElementById("btnAddIncome"),
     btnAddExpense: document.getElementById("btnAddExpense"),
     btnExport: document.getElementById("btnExport"),
@@ -138,18 +135,56 @@
     return months;
   }
 
+  function incomeColumnKey(row) {
+    if (isSalaryLabel(row.label)) return "salary";
+    if (isAdvanceLabel(row.label)) return "advance";
+    if (isVacationLabel(row.label)) return "vacation";
+    return `name:${String(row.label || "").trim().toLowerCase()}`;
+  }
+
+  function incomeColumns(month) {
+    return month.income.map((row) => ({
+      key: incomeColumnKey(row),
+      label: row.label,
+    }));
+  }
+
   function normalizeExpense(row) {
-    if (!("salary" in row)) {
-      const oldPlan = Number(row.plan) || 0;
-      const oldFact = row.fact == null || row.fact === "" ? null : Number(row.fact);
-      row.salary = oldPlan;
-      row.salaryManual = oldPlan !== 0;
-      row.advance = oldFact;
-      row.advanceManual = oldFact != null;
-      row.plan = null;
-      row.planManual = false;
+    if (!row.shares) {
+      row.shares = {};
+      row.sharesManual = {};
+      const hadSalary = "salary" in row;
+      if (!hadSalary && ("fact" in row || row.planManual == null)) {
+        const oldPlan = Number(row.plan) || 0;
+        const oldFact = row.fact == null || row.fact === "" ? null : Number(row.fact);
+        row.plan = oldPlan || null;
+        row.planManual = oldPlan !== 0;
+        if (oldFact != null) {
+          row.shares.advance = oldFact;
+          row.sharesManual.advance = true;
+        }
+      } else if (hadSalary) {
+        const salaryEmpty = row.salary == null || row.salary === "";
+        const planEmpty = row.plan == null || row.plan === "";
+        if (!salaryEmpty && planEmpty) {
+          row.plan = Number(row.salary) || 0;
+          row.planManual = row.salaryManual !== false;
+        } else if (!salaryEmpty && Number(row.salary) !== 0) {
+          row.shares.salary = Number(row.salary) || 0;
+          row.sharesManual.salary = !!row.salaryManual;
+        }
+        if (row.advance != null && row.advance !== "") {
+          row.shares.advance = Number(row.advance) || 0;
+          row.sharesManual.advance = !!row.advanceManual;
+        }
+      }
       delete row.fact;
+      delete row.salary;
+      delete row.salaryManual;
+      delete row.advance;
+      delete row.advanceManual;
     }
+    if (!row.sharesManual) row.sharesManual = {};
     return row;
   }
 
@@ -161,9 +196,10 @@
         (item) => String(item.name).trim().toLowerCase() === String(row.name).trim().toLowerCase()
       );
       if (!src) return;
-      ["plan", "salary", "advance"].forEach((field) => {
-        if (row[`${field}Manual`]) return;
-        row[field] = src[field] == null || src[field] === "" ? null : Number(src[field]) || 0;
+      if (!row.planManual) row.plan = src.plan == null || src.plan === "" ? null : Number(src.plan) || 0;
+      Object.entries(src.shares || {}).forEach(([key, value]) => {
+        if (row.sharesManual[key]) return;
+        row.shares[key] = value == null || value === "" ? null : Number(value) || 0;
       });
     });
   }
@@ -472,17 +508,21 @@
     return state.months[state.currentMonth];
   }
 
+  function columnSum(month, key) {
+    return month.expenses.reduce((sum, row) => {
+      normalizeExpense(row);
+      const value = key === "plan" ? row.plan : row.shares[key];
+      return sum + (Number(value) || 0);
+    }, 0);
+  }
+
   function totals(month) {
     const income = month.income.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const plan = month.expenses.reduce((s, r) => s + (Number(r.plan) || 0), 0);
-    const salary = month.expenses.reduce((s, r) => s + (Number(r.salary) || 0), 0);
-    const advanceRows = month.expenses.filter((r) => r.advance != null && r.advance !== "");
-    const advance = advanceRows.length
-      ? month.expenses.reduce((s, r) => s + (r.advance == null ? 0 : Number(r.advance) || 0), 0)
-      : null;
-    const spent = salary + (advance || 0);
-    const remain = income - plan;
-    return { income, plan, salary, advance, spent, fact: spent, remain };
+    const plan = columnSum(month, "plan");
+    const spent = month.expenses.reduce((sum, row) => {
+      return sum + Object.values(row.shares || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+    }, 0);
+    return { income, plan, spent, fact: spent, remain: income - plan };
   }
 
   function renderYearNav() {
@@ -743,26 +783,35 @@
     });
   }
 
-  function expenseDelta(row) {
-    if (row.plan == null && row.salary == null && row.advance == null) return null;
-    const spent = (Number(row.salary) || 0) + (row.advance == null ? 0 : Number(row.advance) || 0);
-    return spent - (Number(row.plan) || 0);
-  }
-
-  function moneyInput(row, field) {
-    const value = row[field];
+  function shareInput(row, key) {
+    const manual = key === "plan" ? row.planManual : row.sharesManual[key];
+    const value = key === "plan" ? row.plan : row.shares[key];
     const shown = value == null || value === "" ? "" : formatEditable(value);
-    const tone = row[`${field}Manual`] ? "" : " is-inherited";
-    return `<input class="num-input${tone}" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-field="${field}" />`;
+    const tone = manual ? "" : " is-inherited";
+    return `<input class="num-input${tone}" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" />`;
   }
 
   function renderExpenses(month) {
+    const columns = incomeColumns(month);
+    els.expenseHead.innerHTML = `
+      <tr>
+        <th>Категория</th>
+        <th class="num">
+          <span class="col-title">План</span>
+          <span class="col-sum" data-sum="plan">${money(columnSum(month, "plan"))}</span>
+        </th>
+        ${columns.map((col) => `
+          <th class="num">
+            <span class="col-title">${escapeAttr(col.label)}</span>
+            <span class="col-sum" data-sum="${escapeAttr(col.key)}">${money(columnSum(month, col.key))}</span>
+          </th>
+        `).join("")}
+        <th class="actions-col"></th>
+      </tr>
+    `;
     els.expenseBody.innerHTML = "";
     month.expenses.forEach((row, index) => {
       normalizeExpense(row);
-      const delta = expenseDelta(row);
-      const deltaClass =
-        delta == null ? "delta-zero" : delta > 0 ? "delta-neg" : delta < 0 ? "delta-pos" : "delta-zero";
       const tr = document.createElement("tr");
       if (animateRows) {
         tr.classList.add("row-in");
@@ -770,50 +819,41 @@
       }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
-        <td class="num">${moneyInput(row, "plan")}</td>
-        <td class="num">${moneyInput(row, "salary")}</td>
-        <td class="num">${moneyInput(row, "advance")}</td>
-        <td class="num ${deltaClass}" data-delta>${delta == null ? "—" : money(delta)}</td>
+        <td class="num">${shareInput(row, "plan")}</td>
+        ${columns.map((col) => `<td class="num">${shareInput(row, col.key)}</td>`).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
       `;
-      const nameInput = tr.querySelector('[data-field="name"]');
-      const deltaCell = tr.querySelector("[data-delta]");
-
-      nameInput.addEventListener("change", () => {
-        row.name = nameInput.value.trim() || "Прочее";
+      tr.querySelector('[data-field="name"]').addEventListener("change", (event) => {
+        row.name = event.target.value.trim() || "Прочее";
         state.seeded = false;
         saveState();
         render();
       });
-
-      const syncRow = () => {
-        const d = expenseDelta(row);
-        deltaCell.textContent = d == null ? "—" : money(d);
-        deltaCell.className = `num ${d == null ? "delta-zero" : d > 0 ? "delta-neg" : d < 0 ? "delta-pos" : "delta-zero"}`;
-        refreshTotalsOnly();
-      };
-
-      ["plan", "salary", "advance"].forEach((field) => {
-        const input = tr.querySelector(`[data-field="${field}"]`);
+      tr.querySelectorAll("[data-key]").forEach((input) => {
         input.addEventListener("change", () => {
+          const key = input.dataset.key;
           const parsed = parseNumber(input.value);
-          row[field] = field === "salary" ? parsed || 0 : parsed;
-          row[`${field}Manual`] = true;
-          input.value = row[field] == null ? "" : formatEditable(row[field]);
+          if (key === "plan") {
+            row.plan = parsed;
+            row.planManual = true;
+          } else {
+            if (parsed == null) delete row.shares[key];
+            else row.shares[key] = parsed;
+            row.sharesManual[key] = true;
+          }
+          input.value = parsed == null ? "" : formatEditable(parsed);
           input.classList.remove("is-inherited");
           state.seeded = false;
           saveState();
-          syncRow();
+          refreshTotalsOnly();
         });
       });
-
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
-        month.expenses = month.expenses.filter((r) => r.id !== row.id);
+        month.expenses = month.expenses.filter((item) => item.id !== row.id);
         state.seeded = false;
         saveState();
         render();
       });
-
       els.expenseBody.appendChild(tr);
     });
   }
@@ -827,14 +867,9 @@
     paintText(els.sumRemain, money(t.remain));
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
-    paintText(els.expensePlanTotal, money(t.plan));
-    paintText(els.expenseSalaryTotal, money(t.salary));
-    paintText(els.expenseAdvanceTotal, t.advance == null ? "—" : money(t.advance));
-    const deltaTotal = t.spent - t.plan;
-    els.expenseDeltaTotal.className = `num ${
-      deltaTotal == null ? "delta-zero" : deltaTotal > 0 ? "delta-neg" : deltaTotal < 0 ? "delta-pos" : "delta-zero"
-    }`;
-    paintText(els.expenseDeltaTotal, deltaTotal == null ? "—" : money(deltaTotal));
+    document.querySelectorAll("#expenseHead [data-sum]").forEach((node) => {
+      paintText(node, money(columnSum(month, node.dataset.sum)));
+    });
   }
 
   function render() {
@@ -960,8 +995,8 @@
       id: uid("exp"),
       name: "Прочее",
       plan: null,
-      salary: null,
-      advance: null,
+      shares: {},
+      sharesManual: {},
     });
     state.seeded = false;
     saveState();
