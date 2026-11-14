@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.20.1";
+  const APP_VERSION = "1.20.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2346,7 +2346,7 @@
 
   function utilityTone(n) {
     if (n == null || n === 0) return "";
-    return n > 0 ? " delta-pos" : " delta-neg";
+    return n > 0 ? " utility-up" : " utility-down";
   }
 
   function renderUtilities() {

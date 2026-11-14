@@ -893,6 +893,14 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   color: var(--income);
 }
 
+.expense-panel .utilities-table input.utility-up {
+  color: var(--expense);
+}
+
+.expense-panel .utilities-table input.utility-down {
+  color: var(--income);
+}
+
 .expense-panel .data-table tbody tr.is-total td,
 .expense-panel .data-table tbody tr.is-total:hover td {
   background: transparent;
