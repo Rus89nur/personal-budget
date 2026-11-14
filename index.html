@@ -7,39 +7,54 @@
   <title>Бюджет 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=1.1.2" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=1.2.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 </head>
 <body>
-  <div class="atmosphere" aria-hidden="true"></div>
-  <p class="app-version" title="Версия программы">1.1.2</p>
+  <input type="checkbox" id="navToggle" class="nav-toggle" />
+  <header class="topbar">
+    <a class="logo" href="#top">бюджет</a>
+    <label class="burger" for="navToggle">
+      <span class="burger-icon"></span>
+      <span class="burger-label">Меню</span>
+    </label>
+  </header>
+  <nav class="nav" aria-label="Действия">
+    <button type="button" class="nav-action" id="btnExport">Экспорт</button>
+    <label class="nav-action file-btn">
+      Импорт
+      <input type="file" id="importFile" accept="application/json,.json" hidden />
+    </label>
+    <button type="button" class="nav-action" id="btnReset">Из таблицы</button>
+    <p class="nav-note">Данные только в этом браузере</p>
+    <p class="app-version" title="Версия программы">1.2.0</p>
+  </nav>
 
-  <header class="hero">
-    <p class="hero-kicker">как вкладка Бюджет_2026</p>
-    <h1 class="hero-brand">Бюджет 2026</h1>
-    <p class="hero-lead">Рабочие дни, ЗП и аванс, пассив, категории расходов и остаток — по месяцам.</p>
-    <div class="hero-actions">
-      <button type="button" class="btn btn-primary" id="btnSettings" title="Оклад и расчёт ЗП">
-        <span class="gear" aria-hidden="true">⚙</span> Настройки
+  <header class="hero" id="top">
+    <div class="hero-scene" aria-hidden="true">
+      <span class="glow glow-a"></span>
+      <span class="glow glow-b"></span>
+      <span class="glow glow-c"></span>
+    </div>
+    <div class="hero-copy">
+      <p class="hero-kicker">как вкладка Бюджет_2026</p>
+      <h1 class="hero-brand">Бюджет 2026</h1>
+      <button type="button" class="cta" id="btnSettings" title="Оклад и расчёт ЗП">
+        <span class="cta-label">Настройки</span>
+        <span class="cta-arrow" aria-hidden="true">→</span>
       </button>
-      <button type="button" class="btn btn-ghost" id="btnExport" title="Скачать JSON">Экспорт</button>
-      <label class="btn btn-ghost file-btn" title="Загрузить JSON">
-        Импорт
-        <input type="file" id="importFile" accept="application/json,.json" hidden />
-      </label>
-      <button type="button" class="btn btn-ghost" id="btnReset" title="Вернуть данные из таблицы">Из таблицы</button>
     </div>
   </header>
 
   <main class="layout">
-    <nav class="month-nav" aria-label="Месяцы 2026" id="monthNav"></nav>
-
     <section class="month-head" aria-live="polite">
-      <div>
+      <div class="sheet-top">
+        <nav class="year-nav" aria-label="Год" id="yearNav"></nav>
+    <nav class="month-nav" aria-label="Месяцы" id="monthNav"></nav>
         <h2 class="month-title" id="monthTitle">январь 2026</h2>
-        <p class="month-hint" id="monthHint">Данные из вашей таблицы Numbers · правятся прямо здесь</p>
       </div>
+      <p class="month-hint" id="monthHint">Данные из вашей таблицы Numbers · правятся прямо здесь</p>
       <div class="summary" id="summary">
         <div class="sum-item">
           <span>Доходы</span>
@@ -63,20 +78,31 @@
     <section class="panel workdays" aria-labelledby="workTitle">
       <div class="panel-head">
         <h3 id="workTitle">Рабочие дни</h3>
-        <p>Как в таблице: всего / работаю / отпуск</p>
+        <p>Аванс — дни с 1 по 15, зарплата — с 16-го. Отпускные считаются отдельно.</p>
       </div>
       <div class="work-grid">
-        <label class="field">
-          <span>Всего раб. дней</span>
-          <input type="text" inputmode="numeric" id="workTotal" autocomplete="off" />
+        <div class="field">
+          <span>Рабочих дней в месяце</span>
+          <strong class="work-total" id="workTotalView">—</strong>
+          <small class="work-split" id="workSplitView"></small>
+        </div>
+        <label class="field check-field">
+          <input type="checkbox" id="workPartial" />
+          <span>Работал не полный месяц</span>
         </label>
         <label class="field">
-          <span>Работаю</span>
-          <input type="text" inputmode="numeric" id="workWorked" autocomplete="off" />
-        </label>
-        <label class="field">
-          <span>Отпуск</span>
+          <span>Отпуск, дней</span>
           <input type="text" inputmode="numeric" id="workVacation" autocomplete="off" />
+        </label>
+      </div>
+      <div class="partial-box" id="partialBox" hidden>
+        <label class="field">
+          <span>Отработано с 1 по 15</span>
+          <input type="text" inputmode="numeric" id="workFirst" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Отработано с 16 по конец</span>
+          <input type="text" inputmode="numeric" id="workSecond" autocomplete="off" />
         </label>
       </div>
     </section>
@@ -145,15 +171,32 @@
   </main>
 
   <footer class="site-foot">
-    <p>Бюджет 2026 · хранится в localStorage этого устройства · GitHub Pages</p>
+    <p class="foot-mark">.бюджет</p>
+    <p>Бюджет 2026 · хранится в localStorage этого устройства</p>
   </footer>
+  <script>
+    const topbar = document.querySelector(".topbar");
+    const hero = document.querySelector(".hero");
+    if (topbar && hero && "IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        ([entry]) => topbar.classList.toggle("is-solid", !entry.isIntersecting),
+        { threshold: 0.2 }
+      );
+      observer.observe(hero);
+    }
+    document.querySelectorAll(".nav-action").forEach((el) => {
+      el.addEventListener("click", () => {
+        document.getElementById("navToggle").checked = false;
+      });
+    });
+  </script>
 
   <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
     <div class="settings-sheet" id="settingsForm">
       <header class="settings-head">
         <div>
           <h2 id="settingsTitle">Настройки зарплаты</h2>
-          <p>Меняется только оклад. Остальные строки считаются от него и не редактируются.</p>
+          <p>Меняются оклад и средний заработок в день. Остальные строки зарплаты считаются сами.</p>
         </div>
         <button type="button" class="icon-x" id="btnSettingsClose" aria-label="Закрыть">×</button>
       </header>
@@ -189,6 +232,11 @@
           <span class="calc-rate"></span>
           <span class="calc-amount" id="netAmount">—</span>
         </div>
+        <label class="calc-row settings-oklad">
+          <span class="calc-label">Средний заработок в день</span>
+          <span class="calc-rate"></span>
+          <input type="text" inputmode="decimal" id="settingsDaily" name="daily" autocomplete="off" />
+        </label>
       </div>
 
       <footer class="settings-foot">
@@ -198,7 +246,8 @@
     </div>
   </dialog>
 
-  <script src="salary.js?v=1.1.2"></script>
-  <script src="app.js?v=1.1.2"></script>
+  <script src="calendar.js?v=1.2.0"></script>
+  <script src="salary.js?v=1.2.0"></script>
+  <script src="app.js?v=1.2.0"></script>
 </body>
 </html>

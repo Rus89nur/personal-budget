@@ -1,7 +1,7 @@
 (() => {
-  const APP_VERSION = "1.1.2";
+  const APP_VERSION = "1.2.0";
   const STORAGE_KEY = "personal-budget-v2";
-  const YEAR = 2026;
+  const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
 
   const MONTHS_RU = [
@@ -27,8 +27,13 @@
     sumPlan: document.getElementById("sumPlan"),
     sumFact: document.getElementById("sumFact"),
     sumRemain: document.getElementById("sumRemain"),
-    workTotal: document.getElementById("workTotal"),
-    workWorked: document.getElementById("workWorked"),
+    yearNav: document.getElementById("yearNav"),
+    workTotalView: document.getElementById("workTotalView"),
+    workSplitView: document.getElementById("workSplitView"),
+    workPartial: document.getElementById("workPartial"),
+    partialBox: document.getElementById("partialBox"),
+    workFirst: document.getElementById("workFirst"),
+    workSecond: document.getElementById("workSecond"),
     workVacation: document.getElementById("workVacation"),
     incomeBody: document.getElementById("incomeBody"),
     incomeTotal: document.getElementById("incomeTotal"),
@@ -50,6 +55,7 @@
     basePayAmount: document.getElementById("basePayAmount"),
     grossAmount: document.getElementById("grossAmount"),
     netAmount: document.getElementById("netAmount"),
+    settingsDaily: document.getElementById("settingsDaily"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
     btnSettingsSave: document.getElementById("btnSettingsSave"),
   };
@@ -62,8 +68,16 @@
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
   }
 
-  function monthKeys() {
-    return Array.from({ length: 12 }, (_, i) => `${YEAR}-${String(i + 1).padStart(2, "0")}`);
+  function monthKeys(year = state?.year || YEARS[0]) {
+    return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  }
+
+  function monthIndex(key) {
+    return Number(String(key).slice(5, 7)) - 1;
+  }
+
+  function yearOf(key) {
+    return Number(String(key).slice(0, 4));
   }
 
   function emptyMonth() {
@@ -89,9 +103,9 @@
     };
   }
 
-  function cloneSeedMonths(seed) {
+  function cloneSeedMonths(seed, year) {
     const months = {};
-    for (const key of monthKeys()) {
+    for (const key of monthKeys(year)) {
       const src = seed?.months?.[key];
       if (!src) {
         months[key] = emptyMonth();
@@ -121,12 +135,52 @@
     return months;
   }
 
-  function currentMonthKey() {
+  function currentMonthKey(year) {
     const now = new Date();
-    if (now.getFullYear() === YEAR) {
-      return `${YEAR}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (now.getFullYear() === year) {
+      return `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     }
-    return `${YEAR}-01`;
+    return `${year}-01`;
+  }
+
+  function stampWorkdays(month, year, index) {
+    const cal = BudgetCalendar.parts(year, index);
+    const prev = month.workdays || {};
+    const worked = prev.worked == null ? null : Number(prev.worked);
+    const partial = Boolean(prev.partial) || (worked != null && worked < cal.total);
+    let first = prev.first;
+    let second = prev.second;
+    if (partial && first == null && second == null && worked != null) {
+      first = Math.min(Math.max(0, worked), cal.first);
+      second = Math.min(Math.max(0, worked - first), cal.second);
+    }
+    month.workdays = {
+      total: cal.total,
+      calendarFirst: cal.first,
+      calendarSecond: cal.second,
+      partial,
+      first: partial ? Number(first) || 0 : cal.first,
+      second: partial ? Number(second) || 0 : cal.second,
+      vacation: prev.vacation == null ? 0 : Number(prev.vacation) || 0,
+    };
+  }
+
+  function blankYear(year) {
+    const months = {};
+    monthKeys(year).forEach((key, index) => {
+      months[key] = emptyMonth();
+      stampWorkdays(months[key], year, index);
+    });
+    return months;
+  }
+
+  function attachYear(target, year) {
+    target.year = year;
+    if (!target.years) target.years = {};
+    if (!target.years[year]) target.years[year] = { months: blankYear(year) };
+    target.months = target.years[year].months;
+    const keys = monthKeys(year);
+    if (!keys.includes(target.currentMonth)) target.currentMonth = currentMonthKey(year);
   }
 
   function defaultOklad(seed) {
@@ -136,15 +190,30 @@
   }
 
   function buildStateFromSeed(seed, seeded = true) {
-    return {
-      version: 2,
-      year: YEAR,
-      currentMonth: currentMonthKey(),
+    const year = YEARS.includes(Number(seed?.year)) ? Number(seed.year) : YEARS[0];
+    const years = {};
+    YEARS.forEach((item) => {
+      years[item] = {
+        months: item === 2026 ? cloneSeedMonths(seed, 2026) : blankYear(item),
+      };
+      monthKeys(item).forEach((key, index) => {
+        if (!years[item].months[key]) years[item].months[key] = emptyMonth();
+        stampWorkdays(years[item].months[key], item, index);
+      });
+    });
+    const next = {
+      version: 3,
+      year,
+      currentMonth: currentMonthKey(year),
       seeded,
       oklad: defaultOklad(seed),
-      months: cloneSeedMonths(seed),
+      dailyAverage: Number(seed?.dailyAverage) || 0,
+      years,
+      needsPayroll: true,
       savedAt: new Date().toISOString(),
     };
+    attachYear(next, year);
+    return next;
   }
 
   function loadState(seed) {
@@ -152,18 +221,31 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return buildStateFromSeed(seed, true);
       const parsed = JSON.parse(raw);
-      if (!parsed || parsed.version !== 2 || !parsed.months) {
+      if (!parsed || (parsed.version !== 2 && parsed.version !== 3)) {
         return buildStateFromSeed(seed, true);
       }
-      for (const key of monthKeys()) {
-        if (!parsed.months[key]) parsed.months[key] = emptyMonth();
+      if (parsed.version === 2 && parsed.months) {
+        parsed.years = { 2026: { months: parsed.months } };
+        parsed.year = 2026;
+        parsed.version = 3;
+        parsed.needsPayroll = true;
       }
-      if (!monthKeys().includes(parsed.currentMonth)) {
-        parsed.currentMonth = currentMonthKey();
-      }
+      if (!parsed.years) return buildStateFromSeed(seed, true);
+      YEARS.forEach((item) => {
+        if (!parsed.years[item]) parsed.years[item] = { months: blankYear(item) };
+        monthKeys(item).forEach((key, index) => {
+          if (!parsed.years[item].months[key]) parsed.years[item].months[key] = emptyMonth();
+          stampWorkdays(parsed.years[item].months[key], item, index);
+        });
+      });
       if (!Number.isFinite(Number(parsed.oklad)) || Number(parsed.oklad) <= 0) {
         parsed.oklad = defaultOklad(seed);
       }
+      if (!Number.isFinite(Number(parsed.dailyAverage)) || Number(parsed.dailyAverage) < 0) {
+        parsed.dailyAverage = 0;
+      }
+      const year = YEARS.includes(Number(parsed.year)) ? Number(parsed.year) : YEARS[0];
+      attachYear(parsed, year);
       return parsed;
     } catch {
       return buildStateFromSeed(seed, true);
@@ -182,79 +264,123 @@
     return /^зп(?=$|\s|[(\[]|[-–—])/i.test(text);
   }
 
-  /** Убрать дубли ЗП/Аванс, оставить по одной строке каждого вида */
+  function isVacationLabel(label) {
+    return /^отпускн/i.test(String(label || "").trim());
+  }
+
+  function isPayrollLabel(label) {
+    return isSalaryLabel(label) || isAdvanceLabel(label) || isVacationLabel(label);
+  }
+
   function dedupePayrollRows(month) {
-    let seenSalary = false;
-    let seenAdvance = false;
+    const seen = { salary: false, advance: false, vacation: false };
     month.income = month.income.filter((row) => {
-      if (isSalaryLabel(row.label)) {
-        if (seenSalary) return false;
-        seenSalary = true;
-        return true;
-      }
-      if (isAdvanceLabel(row.label)) {
-        if (seenAdvance) return false;
-        seenAdvance = true;
-        return true;
-      }
+      const kind = isSalaryLabel(row.label)
+        ? "salary"
+        : isAdvanceLabel(row.label)
+          ? "advance"
+          : isVacationLabel(row.label)
+            ? "vacation"
+            : "";
+      if (!kind) return true;
+      if (seen[kind]) return false;
+      seen[kind] = true;
       return true;
     });
   }
 
   function ensureIncomeRow(month, kind, label) {
-    const match =
-      kind === "advance"
-        ? month.income.find((r) => isAdvanceLabel(r.label))
-        : month.income.find((r) => isSalaryLabel(r.label));
+    const match = month.income.find((row) => {
+      if (kind === "advance") return isAdvanceLabel(row.label);
+      if (kind === "vacation") return isVacationLabel(row.label);
+      return isSalaryLabel(row.label);
+    });
     if (match) {
       match.label = label;
       return match;
     }
-    const row = { id: uid("inc"), label, amount: 0 };
-    const insertAt = kind === "salary" ? 0 : month.income.findIndex((r) => !isSalaryLabel(r.label));
+    const row = { id: uid("inc"), label, amount: 0, manual: false };
+    const order = ["salary", "advance", "vacation"];
+    const slot = order.indexOf(kind);
+    let insertAt = month.income.findIndex((row) => {
+      const rowKind = isSalaryLabel(row.label) ? 0 : isAdvanceLabel(row.label) ? 1 : isVacationLabel(row.label) ? 2 : 3;
+      return rowKind > slot;
+    });
     if (insertAt < 0) month.income.push(row);
     else month.income.splice(insertAt, 0, row);
     return row;
   }
 
+  function workedParts(month) {
+    const days = month.workdays;
+    if (days.partial) {
+      return {
+        first: Math.min(Math.max(0, Number(days.first) || 0), days.calendarFirst),
+        second: Math.min(Math.max(0, Number(days.second) || 0), days.calendarSecond),
+      };
+    }
+    return { first: days.calendarFirst, second: days.calendarSecond };
+  }
+
+  function monthBag(target, year, index) {
+    if (index < 0) return null;
+    return target.years?.[year]?.months?.[`${year}-${String(index + 1).padStart(2, "0")}`] || null;
+  }
+
+  function writeAmount(row, amount, force) {
+    if (!row) return;
+    if (row.manual && !force) return;
+    row.amount = amount;
+    if (force) row.manual = false;
+  }
+
   /**
-   * Обновляет строки «ЗП» / «Аванс» во всех месяцах по окладу и рабочим дням.
-   * Аванс месяца M — от factor(M); ЗП в месяце M — от factor(M−1) (ЗП прошлого месяца).
+   * Аванс месяца — доля зарплаты за рабочие дни 1–15.
+   * Зарплата в месяце — доля предыдущего месяца за дни с 16-го.
+   * Отпускные — дни отпуска × средний заработок в день.
    */
-  function applySalaryToMonths(target = state, { silent = false } = {}) {
-    if (!target?.months) return;
-    const calc = Salary.calculateFromOklad(target.oklad);
-    const keys = monthKeys();
+  function applySalaryToMonths(target = state, { silent = false, force = false } = {}) {
+    if (!target?.years) return;
+    const net = Salary.calculateFromOklad(target.oklad).net;
+    const daily = Number(target.dailyAverage) || 0;
 
-    keys.forEach((key, index) => {
-      const month = target.months[key];
-      if (!month) return;
+    const share = (month) => {
+      if (!month) return null;
+      const parts = workedParts(month);
+      return {
+        advance: Salary.payForDays(net, month.workdays.total, parts.first),
+        salary: Salary.payForDays(net, month.workdays.total, parts.second),
+        vacation: Salary.roundRuble(daily * (Number(month.workdays.vacation) || 0)),
+      };
+    };
 
-      dedupePayrollRows(month);
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key, index) => {
+        const month = target.years[year].months[key];
+        if (!month) return;
+        dedupePayrollRows(month);
+        const own = share(month);
+        const prev = index > 0
+          ? share(monthBag(target, year, index - 1))
+          : share(monthBag(target, year - 1, 11));
 
-      const advancePay = Salary.scalePay(calc, Salary.workFactor(month.workdays));
-      const prevKey = index > 0 ? keys[index - 1] : null;
-      const prevFactor = prevKey
-        ? Salary.workFactor(target.months[prevKey]?.workdays)
-        : 1;
-      const salaryPay = Salary.scalePay(calc, prevFactor);
+        const salaryRow = ensureIncomeRow(
+          month,
+          "salary",
+          index === 0 ? "ЗП декабря" : `ЗП ${MONTH_GENITIVE[index - 1]}`
+        );
+        if (prev) writeAmount(salaryRow, prev.salary, force);
 
-      const advanceLabel = `Аванс ${MONTH_GENITIVE[index]}`;
-      const salaryLabel =
-        index === 0 ? "ЗП декабря" : `ЗП ${MONTH_GENITIVE[index - 1]}`;
+        const advanceRow = ensureIncomeRow(month, "advance", `Аванс ${MONTH_GENITIVE[index]}`);
+        writeAmount(advanceRow, own.advance, force);
 
-      const salaryRow = ensureIncomeRow(month, "salary", salaryLabel);
-      salaryRow.amount = salaryPay.salary;
-
-      const advanceRow = ensureIncomeRow(month, "advance", advanceLabel);
-      advanceRow.amount = advancePay.advance;
-
-      dedupePayrollRows(month);
+        const vacationRow = ensureIncomeRow(month, "vacation", "Отпускные");
+        writeAmount(vacationRow, own.vacation, force);
+        dedupePayrollRows(month);
+      });
     });
 
-    if (!silent) {
-      target.seeded = false;
-    }
+    if (!silent) target.seeded = false;
   }
 
   function saveState() {
@@ -282,7 +408,7 @@
 
   function monthLabel(key) {
     const m = Number(key.slice(5, 7));
-    return `${MONTHS_RU[m - 1]} ${YEAR}`;
+    return `${MONTHS_RU[m - 1]} ${yearOf(key)}`;
   }
 
   function activeMonth() {
@@ -299,6 +425,24 @@
     const remain = income - plan;
     const remainFact = fact == null ? null : income - fact;
     return { income, plan, fact, remain, remainFact, factCount: factRows.length };
+  }
+
+  function renderYearNav() {
+    if (!els.yearNav) return;
+    els.yearNav.innerHTML = "";
+    YEARS.forEach((year) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `month-chip${year === state.year ? " active" : ""}`;
+      btn.textContent = String(year);
+      btn.setAttribute("aria-pressed", year === state.year ? "true" : "false");
+      btn.addEventListener("click", () => {
+        attachYear(state, year);
+        saveState();
+        render();
+      });
+      els.yearNav.appendChild(btn);
+    });
   }
 
   function renderMonthNav() {
@@ -318,29 +462,73 @@
     });
   }
 
-  function bindWorkdays(month) {
-    const map = [
-      [els.workTotal, "total"],
-      [els.workWorked, "worked"],
-      [els.workVacation, "vacation"],
-    ];
-    map.forEach(([input, key]) => {
-      const value = month.workdays[key];
-      input.value = value == null ? "" : String(value);
-      input.oninput = () => {
-        month.workdays[key] = parseNumber(input.value);
-        if (key === "total" || key === "worked") {
-          applySalaryToMonths(state);
-        } else {
-          state.seeded = false;
-        }
-        saveState();
-        if (key === "total" || key === "worked") {
-          renderIncome(activeMonth());
-          refreshTotalsOnly();
-        }
-      };
+  function unlockPayroll(month, kinds) {
+    month.income.forEach((row) => {
+      const kind = isSalaryLabel(row.label)
+        ? "salary"
+        : isAdvanceLabel(row.label)
+          ? "advance"
+          : isVacationLabel(row.label)
+            ? "vacation"
+            : "";
+      if (kinds.includes(kind)) row.manual = false;
     });
+  }
+
+  function neighborMonth(year, index, step) {
+    const date = new Date(year, index + step, 1);
+    const nextYear = date.getFullYear();
+    const nextIndex = date.getMonth();
+    return state.years?.[nextYear]?.months?.[`${nextYear}-${String(nextIndex + 1).padStart(2, "0")}`] || null;
+  }
+
+  function bindWorkdays(month) {
+    const days = month.workdays;
+    const year = yearOf(state.currentMonth);
+    const index = monthIndex(state.currentMonth);
+    els.workTotalView.textContent = String(days.total);
+    els.workSplitView.textContent = `1–15: ${days.calendarFirst} дн. · с 16-го: ${days.calendarSecond} дн.`;
+    els.workPartial.checked = Boolean(days.partial);
+    els.partialBox.hidden = !days.partial;
+    els.workFirst.value = days.partial ? String(days.first ?? "") : "";
+    els.workSecond.value = days.partial ? String(days.second ?? "") : "";
+    els.workVacation.value = days.vacation ? String(days.vacation) : "";
+
+    const refreshPay = () => {
+      unlockPayroll(month, ["advance", "vacation"]);
+      const next = neighborMonth(year, index, 1);
+      if (next) unlockPayroll(next, ["salary"]);
+      applySalaryToMonths(state);
+      saveState();
+      renderIncome(activeMonth());
+      refreshTotalsOnly();
+    };
+
+    els.workPartial.onchange = () => {
+      days.partial = els.workPartial.checked;
+      els.partialBox.hidden = !days.partial;
+      if (days.partial && !days.first && !days.second) {
+        days.first = days.calendarFirst;
+        days.second = days.calendarSecond;
+      }
+      els.workFirst.value = String(days.first ?? 0);
+      els.workSecond.value = String(days.second ?? 0);
+      refreshPay();
+    };
+    els.workFirst.oninput = () => {
+      const value = Math.max(0, parseNumber(els.workFirst.value) || 0);
+      days.first = Math.min(value, days.calendarFirst);
+      refreshPay();
+    };
+    els.workSecond.oninput = () => {
+      const value = Math.max(0, parseNumber(els.workSecond.value) || 0);
+      days.second = Math.min(value, days.calendarSecond);
+      refreshPay();
+    };
+    els.workVacation.oninput = () => {
+      days.vacation = Math.max(0, parseNumber(els.workVacation.value) || 0);
+      refreshPay();
+    };
   }
 
   function lineAmount(calc, key) {
@@ -361,6 +549,7 @@
     if (!state) return;
     settingsDraftOklad = state.oklad;
     els.settingsOklad.value = formatEditable(state.oklad);
+    els.settingsDaily.value = state.dailyAverage ? formatEditable(state.dailyAverage) : "";
     try {
       renderSettingsCalc(state.oklad);
     } catch (err) {
@@ -397,6 +586,13 @@
       return false;
     }
     state.oklad = parsed;
+    const daily = parseNumber(els.settingsDaily.value);
+    state.dailyAverage = daily == null || daily < 0 ? 0 : daily;
+    YEARS.forEach((year) => {
+      Object.values(state.years[year].months).forEach((month) => {
+        unlockPayroll(month, ["salary", "advance", "vacation"]);
+      });
+    });
     applySalaryToMonths(state);
     saveState();
     render();
@@ -406,28 +602,29 @@
   function renderIncome(month) {
     els.incomeBody.innerHTML = "";
     month.income.forEach((row) => {
-      const payrollLocked = isAdvanceLabel(row.label) || isSalaryLabel(row.label);
+      const payroll = isPayrollLabel(row.label);
       const tr = document.createElement("tr");
-      if (payrollLocked) tr.classList.add("payroll-derived");
+      if (payroll) tr.classList.add("payroll-derived");
       tr.innerHTML = `
-        <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payrollLocked ? "readonly" : ""} /></td>
-        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" ${payrollLocked ? "readonly title=\"Считается из оклада в Настройках\"" : ""} /></td>
-        <td class="actions-col">${payrollLocked ? "" : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`}</td>
+        <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payroll ? "readonly" : ""} /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" title="${payroll ? "Можно поправить вручную" : ""}" /></td>
+        <td class="actions-col">${payroll ? "" : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`}</td>
       `;
       const labelInput = tr.querySelector('[data-field="label"]');
       const amountInput = tr.querySelector('[data-field="amount"]');
-      if (!payrollLocked) {
+      amountInput.addEventListener("change", () => {
+        row.amount = parseNumber(amountInput.value) || 0;
+        row.manual = true;
+        amountInput.value = formatEditable(row.amount);
+        state.seeded = false;
+        saveState();
+        refreshTotalsOnly();
+      });
+      if (!payroll) {
         labelInput.addEventListener("change", () => {
           row.label = labelInput.value.trim() || "Прочее";
           state.seeded = false;
           saveState();
-        });
-        amountInput.addEventListener("change", () => {
-          row.amount = parseNumber(amountInput.value) || 0;
-          amountInput.value = formatEditable(row.amount);
-          state.seeded = false;
-          saveState();
-          refreshTotalsOnly();
         });
         tr.querySelector('[data-act="del"]').addEventListener("click", () => {
           month.income = month.income.filter((r) => r.id !== row.id);
@@ -524,6 +721,7 @@
     els.monthHint.textContent = state.seeded
       ? "Стартовые цифры из Бюджет_2026 — можно править, факт вводить отдельно"
       : "Данные хранятся только в этом браузере";
+    renderYearNav();
     renderMonthNav();
     bindWorkdays(month);
     renderIncome(month);
@@ -548,17 +746,18 @@
   function exportData() {
     const payload = {
       version: 2,
-      year: YEAR,
-      source: "Бюджет_2026",
+      year: state.year,
+      source: "Бюджет",
       exportedAt: new Date().toISOString(),
       oklad: state.oklad,
+      dailyAverage: state.dailyAverage,
       months: state.months,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `budget-2026-${state.currentMonth}.json`;
+    a.download = `budget-${state.currentMonth}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -682,11 +881,16 @@
       if (!res.ok) throw new Error("seed missing");
       seedTemplate = await res.json();
     } catch {
-      seedTemplate = { version: 2, year: YEAR, months: {} };
+      seedTemplate = { version: 3, year: state?.year || 2026, months: {} };
     }
     state = loadState(seedTemplate);
     if (!Number.isFinite(Number(state.oklad)) || Number(state.oklad) <= 0) {
       state.oklad = defaultOklad(seedTemplate);
+    }
+    if (state.needsPayroll) {
+      applySalaryToMonths(state, { force: true });
+      delete state.needsPayroll;
+      saveState();
     }
     render();
   }

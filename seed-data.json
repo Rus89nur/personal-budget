@@ -29,7 +29,7 @@
   "months": {
     "2026-01": {
       "workdays": {
-        "total": null,
+        "total": 15,
         "worked": null,
         "vacation": null
       },
@@ -126,7 +126,7 @@
     },
     "2026-02": {
       "workdays": {
-        "total": null,
+        "total": 19,
         "worked": null,
         "vacation": null
       },

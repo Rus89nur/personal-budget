@@ -97,12 +97,21 @@
     };
   }
 
+  /** Доля месячной зарплаты на руки за указанное число рабочих дней. */
+  function payForDays(net, totalDays, days) {
+    const total = Number(totalDays) || 0;
+    const count = Number(days) || 0;
+    if (total <= 0 || count <= 0) return 0;
+    return roundRuble(((Number(net) || 0) * Math.min(count, total)) / total);
+  }
+
   window.BudgetSalary = {
     DEFAULT_OKLAD,
     RATES,
     calculateFromOklad,
     workFactor,
     scalePay,
+    payForDays,
     roundRuble,
     roundMoney,
   };
