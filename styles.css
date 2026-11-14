@@ -1445,6 +1445,27 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 @media (max-width: 720px) {
   .burger-label { display: none; }
   .month-title { align-self: flex-start; }
+
+  /* Телефон: все месяцы сразу, без горизонтального скролла */
+  .month-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
+    overflow: visible;
+    scroll-snap-type: none;
+    touch-action: manipulation;
+    scrollbar-width: none;
+  }
+
+  .month-nav .month-chip {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.84rem;
+    text-align: center;
+    scroll-snap-align: unset;
+  }
 }
 
 @media (max-width: 860px) {
