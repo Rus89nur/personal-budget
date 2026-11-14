@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.2.4";
+  const APP_VERSION = "1.3.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -45,6 +45,10 @@
     expenseFactTotal: document.getElementById("expenseFactTotal"),
     expenseDeltaTotal: document.getElementById("expenseDeltaTotal"),
     btnAddIncome: document.getElementById("btnAddIncome"),
+    btnOpenIncome: document.getElementById("btnOpenIncome"),
+    btnCloseIncome: document.getElementById("btnCloseIncome"),
+    incomePage: document.getElementById("incomePage"),
+    incomeWhen: document.getElementById("incomeWhen"),
     btnAddExpense: document.getElementById("btnAddExpense"),
     btnExport: document.getElementById("btnExport"),
     importFile: document.getElementById("importFile"),
@@ -788,6 +792,7 @@
     animateRows = paintedKey == null || switched;
     paintedKey = key;
     els.monthTitle.textContent = monthLabel(state.currentMonth);
+    if (els.incomeWhen) els.incomeWhen.textContent = monthLabel(state.currentMonth);
     els.monthHint.textContent = state.seeded
       ? "Стартовые цифры из Бюджет_2026 — можно править, факт вводить отдельно"
       : "Данные хранятся только в этом браузере";
@@ -890,6 +895,50 @@
     saveState();
     render();
   }
+
+  function setIncomeOpen(open) {
+    document.body.classList.toggle("is-income", open);
+    if (!els.incomePage) return;
+    els.incomePage.setAttribute("aria-hidden", open ? "false" : "true");
+    els.incomePage.inert = !open;
+    if (open) els.incomePage.scrollTop = 0;
+  }
+
+  function openIncome() {
+    if (document.body.classList.contains("is-income")) return;
+    history.pushState({ view: "income" }, "");
+    setIncomeOpen(true);
+    els.btnCloseIncome.focus();
+  }
+
+  function closeIncome() {
+    if (!document.body.classList.contains("is-income")) return;
+    if (history.state && history.state.view === "income") {
+      history.back();
+      return;
+    }
+    setIncomeOpen(false);
+    els.btnOpenIncome.focus();
+  }
+
+  els.btnOpenIncome.addEventListener("click", openIncome);
+  els.btnCloseIncome.addEventListener("click", closeIncome);
+  window.addEventListener("popstate", () => {
+    const open = Boolean(history.state && history.state.view === "income");
+    setIncomeOpen(open);
+    if (!open) els.btnOpenIncome.focus();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !document.body.classList.contains("is-income")) return;
+    if (els.settingsDialog.open) return;
+    closeIncome();
+  });
+  document.querySelector(".logo").addEventListener("click", (e) => {
+    if (!document.body.classList.contains("is-income")) return;
+    e.preventDefault();
+    closeIncome();
+  });
+  setIncomeOpen(false);
 
   els.btnAddIncome.addEventListener("click", () => {
     activeMonth().income.push({ id: uid("inc"), label: "Прочее", amount: 0 });

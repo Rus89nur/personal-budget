@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=1.2.4" />
+  <link rel="stylesheet" href="styles.css?v=1.3.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -20,7 +20,7 @@
         <span class="burger-icon"></span>
         <span class="burger-label">Меню</span>
       </label>
-      <p class="app-version" title="Версия программы">1.2.4</p>
+      <p class="app-version" title="Версия программы">1.3.0</p>
     </div>
   </header>
   <nav class="nav" aria-label="Действия">
@@ -33,6 +33,7 @@
     <p class="nav-note">Данные только в этом браузере</p>
   </nav>
 
+  <div class="stage" id="homeStage">
   <header class="hero" id="top">
     <div class="hero-scene" aria-hidden="true">
       <span class="glow glow-a"></span>
@@ -55,10 +56,10 @@
     <section class="month-head" aria-live="polite">
       <p class="month-hint" id="monthHint">Данные из вашей таблицы Numbers · правятся прямо здесь</p>
       <div class="summary" id="summary">
-        <div class="sum-item">
+        <button type="button" class="sum-item sum-link" id="btnOpenIncome">
           <span>Доходы</span>
           <strong id="sumIncome">0 ₽</strong>
-        </div>
+        </button>
         <div class="sum-item expense">
           <span>Расходы · план</span>
           <strong id="sumPlan">0 ₽</strong>
@@ -116,35 +117,6 @@
       </div>
     </section>
 
-    <section class="panel income-panel" aria-labelledby="incomeTitle">
-      <div class="panel-head">
-        <div>
-          <h3 id="incomeTitle">Доходы · ЗП + пассив</h3>
-          <p>ЗП предыдущего месяца, аванс, КВ, брокер / вклад и прочее</p>
-        </div>
-        <button type="button" class="btn btn-small" id="btnAddIncome">+ доход</button>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table" id="incomeTable">
-          <thead>
-            <tr>
-              <th>Источник</th>
-              <th class="num">Сумма</th>
-              <th class="actions-col"></th>
-            </tr>
-          </thead>
-          <tbody id="incomeBody"></tbody>
-          <tfoot>
-            <tr>
-              <th>Итого доходов</th>
-              <th class="num" id="incomeTotal">0 ₽</th>
-              <th></th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </section>
-
     <section class="panel expense-panel" aria-labelledby="expenseTitle">
       <div class="panel-head">
         <div>
@@ -183,6 +155,42 @@
     <p class="foot-mark">.бюджет</p>
     <p>Бюджет 2026 · хранится в localStorage этого устройства</p>
   </footer>
+  </div>
+
+  <section class="stage-page" id="incomePage" aria-labelledby="incomeTitle" aria-hidden="true" inert>
+    <div class="stage-page-bar">
+      <button type="button" class="back-link" id="btnCloseIncome">На главную</button>
+      <p class="stage-page-when" id="incomeWhen">январь 2026</p>
+    </div>
+    <section class="panel income-panel" aria-labelledby="incomeTitle">
+      <div class="panel-head">
+        <div>
+          <h3 id="incomeTitle">Доходы · ЗП + пассив</h3>
+          <p>ЗП предыдущего месяца, аванс, КВ, брокер / вклад и прочее</p>
+        </div>
+        <button type="button" class="btn btn-small" id="btnAddIncome">+ доход</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="incomeTable">
+          <thead>
+            <tr>
+              <th>Источник</th>
+              <th class="num">Сумма</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody id="incomeBody"></tbody>
+          <tfoot>
+            <tr>
+              <th>Итого доходов</th>
+              <th class="num" id="incomeTotal">0 ₽</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  </section>
   <script>
     const topbar = document.querySelector(".topbar");
     const hero = document.querySelector(".hero");
@@ -250,8 +258,8 @@
     </div>
   </dialog>
 
-  <script src="calendar.js?v=1.2.4"></script>
-  <script src="salary.js?v=1.2.4"></script>
-  <script src="app.js?v=1.2.4"></script>
+  <script src="calendar.js?v=1.3.0"></script>
+  <script src="salary.js?v=1.3.0"></script>
+  <script src="app.js?v=1.3.0"></script>
 </body>
 </html>

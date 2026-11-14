@@ -35,6 +35,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   font-family: var(--font-body);
   color: var(--ink);
   background: var(--paper);
@@ -612,6 +613,23 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .sum-item:hover { transform: translateY(-3px); }
 
+.sum-link {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sum-link span::after {
+  content: "открыть";
+  margin-left: 0.45rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  opacity: 0.55;
+}
+
 .sum-item strong.tick,
 .data-table tfoot th.tick {
   animation: tick 0.5s var(--ease);
@@ -799,6 +817,78 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: rgba(31, 77, 74, 0.06);
   color: var(--ink-soft);
   cursor: default;
+}
+
+.stage {
+  transition: transform 0.7s var(--ease), opacity 0.7s var(--ease);
+}
+
+body.is-income .stage {
+  transform: translateX(-7%) scale(0.985);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+body.is-income .topbar {
+  background: rgba(232, 228, 220, 0.94);
+  color: var(--ink);
+  backdrop-filter: blur(14px);
+}
+
+.stage-page {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  overflow: auto;
+  padding: 5.4rem var(--pad) 3rem;
+  background: var(--paper);
+  box-shadow: -28px 0 70px rgba(18, 16, 14, 0.22);
+  transform: translate3d(100%, 0, 0);
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.7s var(--ease), visibility 0s linear 0.7s;
+}
+
+body.is-income .stage-page {
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.7s var(--ease), visibility 0s;
+}
+
+.stage-page-bar,
+.stage-page .income-panel {
+  width: min(var(--max), 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stage-page-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.back-link {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.back-link:hover { opacity: 0.6; }
+
+.stage-page-when {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
 }
 
 .site-foot {
