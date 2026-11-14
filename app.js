@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.0";
+  const APP_VERSION = "1.8.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1675,11 +1675,22 @@
   function compareView(current, previous) {
     const compare = utilityCompare(current, previous);
     return {
-      currentText: current == null ? "—" : formatEditable(current),
-      prevText: previous == null ? "—" : formatEditable(previous),
-      delta: compare ? `<span class="${utilityTone(compare.delta).trim()}">${formatSigned(compare.delta)}</span>` : "—",
-      percent: compare ? `<span class="${utilityTone(compare.percent).trim()}">${formatPercent(compare.percent)}</span>` : "—",
+      currentText: current == null ? "" : formatEditable(current),
+      prevText: previous == null ? "" : formatEditable(previous),
+      deltaText: compare ? formatSigned(compare.delta) : "",
+      percentText: compare ? formatPercent(compare.percent) : "",
+      deltaTone: compare ? utilityTone(compare.delta).trim() : "",
+      percentTone: compare ? utilityTone(compare.percent).trim() : "",
     };
+  }
+
+  function readCell(value, tone) {
+    const cls = tone ? ` ${tone}` : "";
+    return `<input class="num-input${cls}" type="text" readonly value="${escapeAttr(value)}" placeholder="—" />`;
+  }
+
+  function nameCell(label) {
+    return `<input class="name-input" type="text" readonly value="${escapeAttr(label)}" />`;
   }
 
   function renderSavings() {
@@ -1688,11 +1699,11 @@
     const prevKey = previousMonthKey(key);
     els.savingsHead.innerHTML = `
       <tr>
-        <th>Строка</th>
-        <th class="num">${escapeAttr(monthChip(prevKey))}</th>
-        <th class="num">${escapeAttr(monthChip(key))}</th>
-        <th class="num">Разница</th>
-        <th class="num">%</th>
+        <th><span class="col-title">Строка</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(prevKey))}</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(key))}</span></th>
+        <th class="num"><span class="col-title">Разница</span></th>
+        <th class="num"><span class="col-title">%</span></th>
       </tr>
     `;
     els.savingsBody.innerHTML = "";
@@ -1703,16 +1714,16 @@
       const previous = row.calc ? savingsCalc(row.calc, prevKey) : savingsStored(row.id, prevKey);
       const view = compareView(current, previous);
       const currentCell = row.calc
-        ? `<span class="is-calc">${view.currentText}</span>`
+        ? readCell(view.currentText)
         : `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`;
       tr.innerHTML = `
-        <td>${escapeAttr(row.name)}</td>
-        <td class="num"><span class="is-calc">${view.prevText}</span></td>
+        <td>${nameCell(row.name)}</td>
+        <td class="num">${readCell(view.prevText)}</td>
         <td class="num">${currentCell}</td>
-        <td class="num"><span class="is-calc">${view.delta}</span></td>
-        <td class="num"><span class="is-calc">${view.percent}</span></td>
+        <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
+        <td class="num">${readCell(view.percentText, view.percentTone)}</td>
       `;
-      const input = tr.querySelector("input");
+      const input = tr.querySelector("input:not([readonly])");
       if (input) {
         input.addEventListener("change", () => {
           const parsed = parseNumber(input.value);
@@ -1815,11 +1826,11 @@
     const prevKey = previousMonthKey(key);
     els.utilitiesHead.innerHTML = `
       <tr>
-        <th>Строка</th>
-        <th class="num">${escapeAttr(monthChip(prevKey))}</th>
-        <th class="num">${escapeAttr(monthChip(key))}</th>
-        <th class="num">Разница</th>
-        <th class="num">%</th>
+        <th><span class="col-title">Строка</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(prevKey))}</span></th>
+        <th class="num"><span class="col-title">${escapeAttr(monthChip(key))}</span></th>
+        <th class="num"><span class="col-title">Разница</span></th>
+        <th class="num"><span class="col-title">%</span></th>
       </tr>
     `;
     els.utilitiesBody.innerHTML = "";
@@ -1831,15 +1842,15 @@
       const view = compareView(current, previous);
       const currentCell = editableId
         ? `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`
-        : `<span class="is-calc">${view.currentText}</span>`;
+        : readCell(view.currentText);
       tr.innerHTML = `
-        <td>${escapeAttr(title)}</td>
-        <td class="num"><span class="is-calc">${view.prevText}</span></td>
+        <td>${nameCell(title)}</td>
+        <td class="num">${readCell(view.prevText)}</td>
         <td class="num">${currentCell}</td>
-        <td class="num"><span class="is-calc">${view.delta}</span></td>
-        <td class="num"><span class="is-calc">${view.percent}</span></td>
+        <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
+        <td class="num">${readCell(view.percentText, view.percentTone)}</td>
       `;
-      const input = tr.querySelector("input");
+      const input = tr.querySelector("input:not([readonly])");
       if (input) {
         input.addEventListener("change", () => {
           const parsed = parseNumber(input.value);
