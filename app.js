@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.7";
+  const APP_VERSION = "1.8.8";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2159,9 +2159,20 @@
     e.target.value = "";
   });
 
+  function clearStaleCaches() {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((reg) => reg.unregister());
+      }).catch(() => {});
+    }
+    if ("caches" in window) {
+      caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
+    }
+  }
+
   function watchForUpdate() {
     const badge = document.querySelector(".app-version");
-    if (badge) badge.textContent = APP_VERSION;
+    if (badge) badge.textContent = `v${APP_VERSION}`;
 
     const check = async () => {
       try {
@@ -2183,8 +2194,9 @@
   }
 
   async function boot() {
+    clearStaleCaches();
     try {
-      const res = await fetch("./seed-data.json", { cache: "no-store" });
+      const res = await fetch(`./seed-data.json?v=${APP_VERSION}`, { cache: "no-store" });
       if (!res.ok) throw new Error("seed missing");
       seedTemplate = await res.json();
     } catch {

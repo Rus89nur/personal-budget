@@ -590,11 +590,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 .app-version {
   margin: 0;
   color: inherit;
-  opacity: 0.72;
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  opacity: 0.9;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .month-nav {
