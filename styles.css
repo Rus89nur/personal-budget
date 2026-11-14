@@ -842,13 +842,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .expense-panel .data-table input.plan-short {
-  background: rgba(196, 149, 58, 0.22);
-  color: #6a4b12;
-}
-
-.expense-panel .data-table tbody input.plan-short:hover,
-.expense-panel .data-table tbody input.plan-short:focus {
-  background: rgba(196, 149, 58, 0.34);
+  color: #9a6424;
 }
 
 .expense-panel #expenseFoot th {
