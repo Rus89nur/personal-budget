@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.4";
+  const APP_VERSION = "1.8.6";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1791,38 +1791,46 @@
     return `<input class="name-input" type="text" readonly value="${escapeAttr(label)}" />`;
   }
 
+  function savingsValue(row, monthKey) {
+    return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
+  }
+
+  function savingsCell(row, monthKey) {
+    const value = savingsValue(row, monthKey);
+    const shown = value == null ? "" : formatEditable(value);
+    if (row.calc) return readCell(shown);
+    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
+  }
+
   function renderSavings() {
     if (!els.savingsHead || !els.savingsBody || !state.savingsFact) return;
     const key = state.currentMonth;
+    const months = [previousMonthKey(previousMonthKey(key)), previousMonthKey(key), key];
     els.savingsHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(key))}</span></th>
+        ${months.map((monthKey) => `<th class="num"><span class="col-title">${escapeAttr(monthChip(monthKey))}</span></th>`).join("")}
       </tr>
     `;
     els.savingsBody.innerHTML = "";
     SAVINGS_ROWS.forEach((row) => {
       const tr = document.createElement("tr");
       if (row.calc) tr.classList.add("is-total");
-      const current = row.calc ? savingsCalc(row.calc, key) : savingsStored(row.id, key);
-      const currentCell = row.calc
-        ? readCell(current == null ? "" : formatEditable(current))
-        : `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
       tr.innerHTML = `
         <td>${nameCell(row.name)}</td>
-        <td class="num">${currentCell}</td>
+        ${months.map((monthKey) => `<td class="num">${savingsCell(row, monthKey)}</td>`).join("")}
       `;
-      const input = tr.querySelector("input:not([readonly])");
-      if (input) {
+      tr.querySelectorAll("input:not([readonly])").forEach((input) => {
         input.addEventListener("change", () => {
+          const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
           if (!state.savingsFact.rows[row.id]) state.savingsFact.rows[row.id] = {};
-          if (parsed == null) delete state.savingsFact.rows[row.id][key];
-          else state.savingsFact.rows[row.id][key] = parsed;
+          if (parsed == null) delete state.savingsFact.rows[row.id][monthKey];
+          else state.savingsFact.rows[row.id][monthKey] = parsed;
           saveState();
           renderSavings();
         });
-      }
+      });
       els.savingsBody.appendChild(tr);
     });
   }
