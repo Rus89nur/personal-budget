@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.5.0";
+  const APP_VERSION = "1.5.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -373,7 +373,55 @@
     ensureRentStructure(next);
     dropKvFromDecember(next);
     ensureTitheStructure(next);
+    applySheetNovemberCosts(next);
     return next;
+  }
+
+  // Вкладка «Бюджет_2026», блок «ноябрь»: план и разложение по ЗП ноября и авансу декабря.
+  const SHEET_NOVEMBER_COSTS = [
+    { name: "отложить", plan: 60000, salary: null, advance: 60000 },
+    { name: "жили были", plan: 60000, salary: 30000, advance: 30000 },
+    { name: "ипотека", plan: 38000, salary: 38000, advance: null },
+    { name: "инет, связи", plan: 2500, salary: 2500, advance: null },
+    { name: "комуналка", plan: 22000, salary: 22000, advance: null },
+    { name: "покупки", plan: 5000, salary: null, advance: 5000 },
+    { name: "отдых", plan: 5000, salary: null, advance: 5000 },
+    { name: "бензин", plan: 10000, salary: 5000, advance: 5000 },
+    { name: "баня", plan: 6200, salary: 1200, advance: 5000 },
+    { name: "отпуск", plan: null, salary: null, advance: null },
+  ];
+
+  function expenseNameKey(name) {
+    return String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/\s+/g, " ");
+  }
+
+  function applySheetNovemberCosts(target) {
+    if (target.sheetNovemberCosts) return false;
+    const month = target.years?.[2026]?.months?.["2026-12"];
+    if (!month?.expenses) return false;
+    const byName = new Map(SHEET_NOVEMBER_COSTS.map((row) => [row.name, row]));
+    month.expenses.forEach((row) => {
+      normalizeExpense(row);
+      const spec = byName.get(expenseNameKey(row.name));
+      if (!spec) return;
+      row.plan = spec.plan;
+      row.planManual = spec.plan != null;
+      ["salary", "advance"].forEach((key) => {
+        if (spec[key] == null) {
+          delete row.shares[key];
+          delete row.sharesManual[key];
+        } else {
+          row.shares[key] = spec[key];
+          row.sharesManual[key] = true;
+        }
+      });
+    });
+    target.sheetNovemberCosts = true;
+    return true;
   }
 
   function loadState(seed) {
@@ -1624,7 +1672,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state)) saveState();
     render();
   }
 
