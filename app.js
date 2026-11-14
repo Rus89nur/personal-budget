@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.2.0";
+  const APP_VERSION = "1.2.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -34,7 +34,10 @@
     partialBox: document.getElementById("partialBox"),
     workFirst: document.getElementById("workFirst"),
     workSecond: document.getElementById("workSecond"),
+    workVacationOn: document.getElementById("workVacationOn"),
+    vacationBox: document.getElementById("vacationBox"),
     workVacation: document.getElementById("workVacation"),
+    workDaily: document.getElementById("workDaily"),
     incomeBody: document.getElementById("incomeBody"),
     incomeTotal: document.getElementById("incomeTotal"),
     expenseBody: document.getElementById("expenseBody"),
@@ -55,7 +58,6 @@
     basePayAmount: document.getElementById("basePayAmount"),
     grossAmount: document.getElementById("grossAmount"),
     netAmount: document.getElementById("netAmount"),
-    settingsDaily: document.getElementById("settingsDaily"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
     btnSettingsSave: document.getElementById("btnSettingsSave"),
   };
@@ -146,22 +148,20 @@
   function stampWorkdays(month, year, index) {
     const cal = BudgetCalendar.parts(year, index);
     const prev = month.workdays || {};
-    const worked = prev.worked == null ? null : Number(prev.worked);
-    const partial = Boolean(prev.partial) || (worked != null && worked < cal.total);
-    let first = prev.first;
-    let second = prev.second;
-    if (partial && first == null && second == null && worked != null) {
-      first = Math.min(Math.max(0, worked), cal.first);
-      second = Math.min(Math.max(0, worked - first), cal.second);
-    }
+    const partial = Boolean(prev.partialChosen);
+    const vacationOn = prev.vacationOn != null ? Boolean(prev.vacationOn) : Number(prev.vacation) > 0;
     month.workdays = {
       total: cal.total,
       calendarFirst: cal.first,
       calendarSecond: cal.second,
+      partialChosen: partial,
       partial,
-      first: partial ? Number(first) || 0 : cal.first,
-      second: partial ? Number(second) || 0 : cal.second,
-      vacation: prev.vacation == null ? 0 : Number(prev.vacation) || 0,
+      first: partial ? Number(prev.first) || 0 : cal.first,
+      second: partial ? Number(prev.second) || 0 : cal.second,
+      vacationOn,
+      vacation: vacationOn ? Number(prev.vacation) || 0 : Number(prev.vacation) || 0,
+      dailyManual: Boolean(prev.dailyManual),
+      dailyRate: prev.dailyRate == null ? null : Number(prev.dailyRate) || 0,
     };
   }
 
@@ -342,15 +342,25 @@
   function applySalaryToMonths(target = state, { silent = false, force = false } = {}) {
     if (!target?.years) return;
     const net = Salary.calculateFromOklad(target.oklad).net;
-    const daily = Number(target.dailyAverage) || 0;
+    const dailyFor = (year) => {
+      let sum = 0;
+      for (let index = 0; index < 12; index += 1) sum += BudgetCalendar.parts(year, index).total;
+      const average = sum / 12;
+      return average ? Salary.roundMoney(net / average) : 0;
+    };
 
-    const share = (month) => {
+    const share = (month, year) => {
       if (!month) return null;
       const parts = workedParts(month);
+      const days = month.workdays;
+      const rate = days.vacationOn
+        ? (days.dailyManual ? Number(days.dailyRate) || 0 : dailyFor(year))
+        : 0;
+      const vacationDays = days.vacationOn ? Number(days.vacation) || 0 : 0;
       return {
-        advance: Salary.payForDays(net, month.workdays.total, parts.first),
-        salary: Salary.payForDays(net, month.workdays.total, parts.second),
-        vacation: Salary.roundRuble(daily * (Number(month.workdays.vacation) || 0)),
+        advance: Salary.payForDays(net, days.total, parts.first),
+        salary: Salary.payForDays(net, days.total, parts.second),
+        vacation: Salary.roundRuble(rate * vacationDays),
       };
     };
 
@@ -359,10 +369,10 @@
         const month = target.years[year].months[key];
         if (!month) return;
         dedupePayrollRows(month);
-        const own = share(month);
+        const own = share(month, year);
         const prev = index > 0
-          ? share(monthBag(target, year, index - 1))
-          : share(monthBag(target, year - 1, 11));
+          ? share(monthBag(target, year, index - 1), year)
+          : share(monthBag(target, year - 1, 11), year - 1);
 
         const salaryRow = ensureIncomeRow(
           month,
@@ -488,11 +498,22 @@
     const index = monthIndex(state.currentMonth);
     els.workTotalView.textContent = String(days.total);
     els.workSplitView.textContent = `1–15: ${days.calendarFirst} дн. · с 16-го: ${days.calendarSecond} дн.`;
-    els.workPartial.checked = Boolean(days.partial);
-    els.partialBox.hidden = !days.partial;
-    els.workFirst.value = days.partial ? String(days.first ?? "") : "";
-    els.workSecond.value = days.partial ? String(days.second ?? "") : "";
-    els.workVacation.value = days.vacation ? String(days.vacation) : "";
+    const suggestedDaily = () => {
+      let sum = 0;
+      for (let i = 0; i < 12; i += 1) sum += BudgetCalendar.parts(year, i).total;
+      const net = Salary.calculateFromOklad(state.oklad).net;
+      return sum ? Salary.roundMoney((net * 12) / sum) : 0;
+    };
+    els.workPartial.checked = Boolean(days.partialChosen);
+    els.partialBox.hidden = !days.partialChosen;
+    els.workFirst.value = days.partialChosen ? String(days.first ?? "") : "";
+    els.workSecond.value = days.partialChosen ? String(days.second ?? "") : "";
+    els.workVacationOn.checked = Boolean(days.vacationOn);
+    els.vacationBox.hidden = !days.vacationOn;
+    els.workVacation.value = days.vacationOn ? String(days.vacation || "") : "";
+    els.workDaily.value = days.vacationOn
+      ? formatEditable(days.dailyManual ? days.dailyRate : suggestedDaily())
+      : "";
 
     const refreshPay = () => {
       unlockPayroll(month, ["advance", "vacation"]);
@@ -505,14 +526,15 @@
     };
 
     els.workPartial.onchange = () => {
-      days.partial = els.workPartial.checked;
-      els.partialBox.hidden = !days.partial;
-      if (days.partial && !days.first && !days.second) {
+      days.partialChosen = els.workPartial.checked;
+      days.partial = days.partialChosen;
+      els.partialBox.hidden = !days.partialChosen;
+      if (days.partialChosen) {
         days.first = days.calendarFirst;
         days.second = days.calendarSecond;
+        els.workFirst.value = String(days.first);
+        els.workSecond.value = String(days.second);
       }
-      els.workFirst.value = String(days.first ?? 0);
-      els.workSecond.value = String(days.second ?? 0);
       refreshPay();
     };
     els.workFirst.oninput = () => {
@@ -525,8 +547,23 @@
       days.second = Math.min(value, days.calendarSecond);
       refreshPay();
     };
+    els.workVacationOn.onchange = () => {
+      days.vacationOn = els.workVacationOn.checked;
+      els.vacationBox.hidden = !days.vacationOn;
+      if (days.vacationOn && !days.dailyManual) {
+        days.dailyRate = suggestedDaily();
+        els.workDaily.value = formatEditable(days.dailyRate);
+      }
+      els.workVacation.value = days.vacation ? String(days.vacation) : "";
+      refreshPay();
+    };
     els.workVacation.oninput = () => {
       days.vacation = Math.max(0, parseNumber(els.workVacation.value) || 0);
+      refreshPay();
+    };
+    els.workDaily.oninput = () => {
+      days.dailyManual = true;
+      days.dailyRate = Math.max(0, parseNumber(els.workDaily.value) || 0);
       refreshPay();
     };
   }
@@ -549,7 +586,6 @@
     if (!state) return;
     settingsDraftOklad = state.oklad;
     els.settingsOklad.value = formatEditable(state.oklad);
-    els.settingsDaily.value = state.dailyAverage ? formatEditable(state.dailyAverage) : "";
     try {
       renderSettingsCalc(state.oklad);
     } catch (err) {
@@ -586,8 +622,6 @@
       return false;
     }
     state.oklad = parsed;
-    const daily = parseNumber(els.settingsDaily.value);
-    state.dailyAverage = daily == null || daily < 0 ? 0 : daily;
     YEARS.forEach((year) => {
       Object.values(state.years[year].months).forEach((month) => {
         unlockPayroll(month, ["salary", "advance", "vacation"]);
@@ -599,12 +633,36 @@
     return true;
   }
 
+  let paintedKey = null;
+  let animateRows = false;
+
+  function markFresh(selector, index) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.style.animationDelay = `${index * 0.07}s`;
+    el.classList.remove("is-fresh");
+    void el.offsetWidth;
+    el.classList.add("is-fresh");
+  }
+
+  function paintText(el, text) {
+    if (!el || el.textContent === text) return;
+    el.textContent = text;
+    el.classList.remove("tick");
+    void el.offsetWidth;
+    el.classList.add("tick");
+  }
+
   function renderIncome(month) {
     els.incomeBody.innerHTML = "";
-    month.income.forEach((row) => {
+    month.income.forEach((row, index) => {
       const payroll = isPayrollLabel(row.label);
       const tr = document.createElement("tr");
       if (payroll) tr.classList.add("payroll-derived");
+      if (animateRows) {
+        tr.classList.add("row-in");
+        tr.style.animationDelay = `${Math.min(index, 8) * 0.045}s`;
+      }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payroll ? "readonly" : ""} /></td>
         <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" title="${payroll ? "Можно поправить вручную" : ""}" /></td>
@@ -639,11 +697,15 @@
 
   function renderExpenses(month) {
     els.expenseBody.innerHTML = "";
-    month.expenses.forEach((row) => {
+    month.expenses.forEach((row, index) => {
       const delta = row.fact == null ? null : (Number(row.fact) || 0) - (Number(row.plan) || 0);
       const deltaClass =
         delta == null ? "delta-zero" : delta > 0 ? "delta-neg" : delta < 0 ? "delta-pos" : "delta-zero";
       const tr = document.createElement("tr");
+      if (animateRows) {
+        tr.classList.add("row-in");
+        tr.style.animationDelay = `${Math.min(index, 12) * 0.04}s`;
+      }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
         <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.plan)}" data-field="plan" /></td>
@@ -700,23 +762,27 @@
   function refreshTotalsOnly() {
     const month = activeMonth();
     const t = totals(month);
-    els.sumIncome.textContent = money(t.income);
-    els.sumPlan.textContent = money(t.plan);
-    els.sumFact.textContent = t.fact == null ? "—" : money(t.fact);
-    els.sumRemain.textContent = money(t.remain);
+    paintText(els.sumIncome, money(t.income));
+    paintText(els.sumPlan, money(t.plan));
+    paintText(els.sumFact, t.fact == null ? "—" : money(t.fact));
+    paintText(els.sumRemain, money(t.remain));
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
-    els.incomeTotal.textContent = money(t.income);
-    els.expensePlanTotal.textContent = money(t.plan);
-    els.expenseFactTotal.textContent = t.fact == null ? "—" : money(t.fact);
+    paintText(els.incomeTotal, money(t.income));
+    paintText(els.expensePlanTotal, money(t.plan));
+    paintText(els.expenseFactTotal, t.fact == null ? "—" : money(t.fact));
     const deltaTotal = t.fact == null ? null : t.fact - t.plan;
-    els.expenseDeltaTotal.textContent = deltaTotal == null ? "—" : money(deltaTotal);
     els.expenseDeltaTotal.className = `num ${
       deltaTotal == null ? "delta-zero" : deltaTotal > 0 ? "delta-neg" : deltaTotal < 0 ? "delta-pos" : "delta-zero"
     }`;
+    paintText(els.expenseDeltaTotal, deltaTotal == null ? "—" : money(deltaTotal));
   }
 
   function render() {
     const month = activeMonth();
+    const key = `${state.year}|${state.currentMonth}`;
+    const switched = paintedKey != null && paintedKey !== key;
+    animateRows = paintedKey == null || switched;
+    paintedKey = key;
     els.monthTitle.textContent = monthLabel(state.currentMonth);
     els.monthHint.textContent = state.seeded
       ? "Стартовые цифры из Бюджет_2026 — можно править, факт вводить отдельно"
@@ -727,6 +793,12 @@
     renderIncome(month);
     renderExpenses(month);
     refreshTotalsOnly();
+    if (switched) {
+      [".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
+        markFresh(selector, index);
+      });
+      document.querySelector(".month-chip.active")?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+    }
   }
 
   function formatEditable(n) {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=1.2.0" />
+  <link rel="stylesheet" href="styles.css?v=1.2.1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -28,7 +28,7 @@
     </label>
     <button type="button" class="nav-action" id="btnReset">Из таблицы</button>
     <p class="nav-note">Данные только в этом браузере</p>
-    <p class="app-version" title="Версия программы">1.2.0</p>
+    <p class="app-version" title="Версия программы">1.2.1</p>
   </nav>
 
   <header class="hero" id="top">
@@ -90,9 +90,9 @@
           <input type="checkbox" id="workPartial" />
           <span>Работал не полный месяц</span>
         </label>
-        <label class="field">
-          <span>Отпуск, дней</span>
-          <input type="text" inputmode="numeric" id="workVacation" autocomplete="off" />
+        <label class="field check-field">
+          <input type="checkbox" id="workVacationOn" />
+          <span>Отпуск</span>
         </label>
       </div>
       <div class="partial-box" id="partialBox" hidden>
@@ -103,6 +103,16 @@
         <label class="field">
           <span>Отработано с 16 по конец</span>
           <input type="text" inputmode="numeric" id="workSecond" autocomplete="off" />
+        </label>
+      </div>
+      <div class="partial-box" id="vacationBox" hidden>
+        <label class="field">
+          <span>Дней отпуска</span>
+          <input type="text" inputmode="numeric" id="workVacation" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Средний заработок в день</span>
+          <input type="text" inputmode="decimal" id="workDaily" autocomplete="off" />
         </label>
       </div>
     </section>
@@ -196,7 +206,7 @@
       <header class="settings-head">
         <div>
           <h2 id="settingsTitle">Настройки зарплаты</h2>
-          <p>Меняются оклад и средний заработок в день. Остальные строки зарплаты считаются сами.</p>
+          <p>Меняется только оклад. Остальные строки считаются от него и не редактируются.</p>
         </div>
         <button type="button" class="icon-x" id="btnSettingsClose" aria-label="Закрыть">×</button>
       </header>
@@ -232,11 +242,6 @@
           <span class="calc-rate"></span>
           <span class="calc-amount" id="netAmount">—</span>
         </div>
-        <label class="calc-row settings-oklad">
-          <span class="calc-label">Средний заработок в день</span>
-          <span class="calc-rate"></span>
-          <input type="text" inputmode="decimal" id="settingsDaily" name="daily" autocomplete="off" />
-        </label>
       </div>
 
       <footer class="settings-foot">
@@ -246,8 +251,8 @@
     </div>
   </dialog>
 
-  <script src="calendar.js?v=1.2.0"></script>
-  <script src="salary.js?v=1.2.0"></script>
-  <script src="app.js?v=1.2.0"></script>
+  <script src="calendar.js?v=1.2.1"></script>
+  <script src="salary.js?v=1.2.1"></script>
+  <script src="app.js?v=1.2.1"></script>
 </body>
 </html>
