@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.15.0";
+  const APP_VERSION = "1.16.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -460,6 +460,7 @@
     if (Array.isArray(analyticsYears)) {
       analyticsYears = analyticsYears.filter((item) => item !== year);
       if (!analyticsYears.length) analyticsYears = [state.year];
+      keepMonthWhenOneYear();
     }
     saveState();
     render();
@@ -2354,7 +2355,13 @@
     analyticsYears = analyticsYears.filter((year) => YEARS.includes(year));
     analyticsMonths = analyticsMonths.filter((index) => index >= 0 && index < 12);
     if (!analyticsYears.length) analyticsYears = [current.year];
-    if (!analyticsMonths.length) analyticsMonths = [current.month];
+    if (!analyticsMonths.length && analyticsYears.length < 2) analyticsMonths = [current.month];
+  }
+
+  function keepMonthWhenOneYear() {
+    if (analyticsYears.length < 2 && !analyticsMonths.length) {
+      analyticsMonths = [currentAnalyticsSelection().month];
+    }
   }
 
   function analyticsIsSingle() {
@@ -2376,6 +2383,7 @@
     analyticsYears = selected
       ? analyticsYears.filter((item) => item !== year)
       : [...analyticsYears, year];
+    keepMonthWhenOneYear();
     analyticsYearPoints = false;
     renderAnalytics();
   }
@@ -2391,7 +2399,7 @@
     analyticsMonths = selected
       ? analyticsMonths.filter((item) => item !== index)
       : [...analyticsMonths, index];
-    if (!analyticsMonths.length) analyticsMonths = [index];
+    if (!analyticsMonths.length && analyticsYears.length < 2) analyticsMonths = [index];
     analyticsYearPoints = false;
     renderAnalytics();
   }
@@ -2692,24 +2700,49 @@
       saved: monthAmounts(item, (key) => savingsTopup(key)),
       utilities: monthAmounts(item, (key) => utilityTotal(key)),
     }));
+    const yearTone = (index) => [
+      { income: "#1d6b45", expense: "#8d3a32", saved: "#9a6424", utility: "#1f4d4a" },
+      { income: "#6aa384", expense: "#c47a72", saved: "#c49658", utility: "#5d8d89" },
+      { income: "#143f2c", expense: "#5c2420", saved: "#6d4718", utility: "#143330" },
+    ][index % 3];
     const flowOf = (pack) => [
       { name: "Доходы", color: "#1d6b45", values: pack.budget.income },
       { name: "Расходы", color: "#8d3a32", values: pack.budget.plan },
     ];
     const savedOf = (pack) => [{ name: "Отложено", color: "#9a6424", values: pack.saved }];
     const utilityOf = (pack) => [{ name: "Коммуналка", color: "#1f4d4a", values: pack.utilities }];
+    const compare = years.length > 1 && marks.length === 0;
+    const compareFlow = packs.flatMap((pack, index) => {
+      const tone = yearTone(index);
+      return [
+        { name: `Доходы ${pack.year}`, color: tone.income, values: pack.budget.income },
+        { name: `Расходы ${pack.year}`, color: tone.expense, values: pack.budget.plan },
+      ];
+    });
+    const compareSaved = packs.map((pack, index) => ({
+      name: `Отложено ${pack.year}`,
+      color: yearTone(index).saved,
+      values: pack.saved,
+    }));
+    const compareUtility = packs.map((pack, index) => ({
+      name: `Коммуналка ${pack.year}`,
+      color: yearTone(index).utility,
+      values: pack.utilities,
+    }));
     const incomeSum = sumNumbers(packs.flatMap((pack) => pack.budget.income));
     const planSum = sumNumbers(packs.flatMap((pack) => pack.budget.plan));
     const savedSum = sumNumbers(packs.flatMap((pack) => pack.saved));
     const utilitySum = sumNumbers(packs.flatMap((pack) => pack.utilities));
     const monthName = MONTHS_RU[selectedMonth] || "";
     const parts = single && !analyticsYearPoints ? monthParts(year, selectedMonth) : null;
-    const viewNote = single
-      ? (analyticsYearPoints
-        ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
-        : "Ещё раз по выбранному месяцу — график с точками за год.")
-      : "Тот же график года: отмеченные месяцы выделены.";
-    const scope = years.length === 1 ? `За ${year}` : "За выбранные годы";
+    const viewNote = compare
+      ? "Сравнение годов тем же графиком по месяцам."
+      : single
+        ? (analyticsYearPoints
+          ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
+          : "Ещё раз по выбранному месяцу — график с точками за год.")
+        : "Тот же график года: отмеченные месяцы выделены.";
+    const scope = compare ? "Сравнение годов" : (years.length === 1 ? `За ${year}` : "За выбранные годы");
     const periodNote = years.length === 1
       ? `Общая сумма по месяцам ${year}`
       : "Общая сумма по выбранным годам";
@@ -2720,9 +2753,12 @@
         return `${caption}${columnChart(MONTHS_SHORT, seriesOf(pack), marks)}`;
       }).join("");
     };
-    const flow = flowOf(packs[0]);
-    const savedSeries = savedOf(packs[0]);
-    const utilitySeries = utilityOf(packs[0]);
+    const flow = compare ? compareFlow : flowOf(packs[0]);
+    const savedSeries = compare ? compareSaved : savedOf(packs[0]);
+    const utilitySeries = compare ? compareUtility : utilityOf(packs[0]);
+    const paint = (series, seriesOf) => (
+      compare ? columnChart(MONTHS_SHORT, series, -1) : drawCharts(seriesOf)
+    );
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2739,20 +2775,20 @@
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
         <p class="chart-note">${scope}: доходы ${escapeAttr(money(incomeSum))}, расходы ${escapeAttr(money(planSum))}. ${viewNote}</p>
-        ${drawCharts(flowOf)}
+        ${paint(flow, flowOf)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
         <p class="chart-note">${periodNote}: ${escapeAttr(money(savedSum))}</p>
-        ${drawCharts(savedOf)}
+        ${paint(savedSeries, savedOf)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
         <p class="chart-note">${periodNote}: ${escapeAttr(money(utilitySum))}</p>
-        ${drawCharts(utilityOf)}
+        ${paint(utilitySeries, utilityOf)}
         ${chartLegend(utilitySeries)}
       </article>
     `;
