@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.14.0";
+  const APP_VERSION = "1.14.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2353,29 +2353,6 @@
     renderAnalytics();
   }
 
-  function analyticsSlots() {
-    ensureAnalyticsFilters();
-    const years = [...analyticsYears].sort((a, b) => a - b);
-    const months = [...analyticsMonths].sort((a, b) => a - b);
-    const multiYear = years.length > 1;
-    const slots = [];
-    years.forEach((year) => {
-      months.forEach((index) => {
-        const month = yearMonth(year, index);
-        const row = month ? totals(month) : { income: 0, plan: 0 };
-        const key = `${year}-${String(index + 1).padStart(2, "0")}`;
-        slots.push({
-          label: multiYear ? `${MONTHS_SHORT[index]} ${String(year).slice(-2)}` : MONTHS_SHORT[index],
-          income: row.income,
-          plan: row.plan,
-          saved: savingsTopup(key) || 0,
-          utilities: utilityTotal(key) || 0,
-        });
-      });
-    });
-    return slots;
-  }
-
   function yearMonth(year, index) {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
     return state.years?.[year]?.months?.[key] || null;
@@ -2465,6 +2442,7 @@
     const plotH = height - padTop - padBottom;
     const rawMax = Math.max(0, ...series.flatMap((item) => item.values.map((n) => Number(n) || 0)));
     const axis = chartAxis(rawMax);
+    const marks = new Set(Array.isArray(markIndex) ? markIndex : (markIndex >= 0 ? [markIndex] : []));
     const groupW = plotW / labels.length;
     const inner = groupW * 0.72;
     const barW = inner / series.length;
@@ -2480,7 +2458,8 @@
     const captions = [];
     labels.forEach((label, index) => {
       const x0 = padLeft + index * groupW;
-      if (markIndex === index) {
+      const marked = marks.has(index);
+      if (marked) {
         bands.push(`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${groupW.toFixed(1)}" height="${plotH}" rx="8" fill="rgba(28,27,25,0.05)" />`);
       }
       series.forEach((item, seriesIndex) => {
@@ -2488,7 +2467,7 @@
         const barH = (value / axis.top) * plotH;
         const x = x0 + (groupW - inner) / 2 + seriesIndex * barW;
         const y = padTop + plotH - barH;
-        const fade = markIndex >= 0 && markIndex !== index ? 0.32 : 1;
+        const fade = marks.size && !marked ? 0.32 : 1;
         bars.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 3, 2).toFixed(1)}" height="${(value > 0 ? Math.max(barH, 1.5) : 0).toFixed(1)}" rx="3" fill="${item.color}" opacity="${fade}" />`);
       });
       hits.push(`<rect class="chart-hit" x="${x0.toFixed(1)}" y="${padTop}" width="${groupW.toFixed(1)}" height="${plotH}" fill="transparent" data-chart-tip="${chartTipPayload(label, series.map((item) => ({ name: item.name, value: Number(item.values[index]) || 0, color: item.color })))}" />`);
@@ -2660,60 +2639,47 @@
     bindAnalyticsReset();
     renderAnalyticsNav();
     const single = analyticsIsSingle();
-    const year = analyticsYears[0];
-    const selectedMonth = analyticsMonths[0];
-    let labels;
-    let flow;
-    let savedSeries;
-    let utilitySeries;
-    let incomeSum;
-    let planSum;
-    let savedSum;
-    let utilitySum;
-    let parts = null;
-    let monthName = "";
-    if (single) {
-      const budget = budgetSeries(year);
-      const saved = monthAmounts(year, (key) => savingsTopup(key));
-      const utilities = monthAmounts(year, (key) => utilityTotal(key));
-      labels = MONTHS_SHORT;
-      flow = [
-        { name: "Доходы", color: "#1d6b45", values: budget.income },
-        { name: "Расходы", color: "#8d3a32", values: budget.plan },
-      ];
-      savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
-      utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
-      incomeSum = sumNumbers(budget.income);
-      planSum = sumNumbers(budget.plan);
-      savedSum = sumNumbers(saved);
-      utilitySum = sumNumbers(utilities);
-      monthName = MONTHS_RU[selectedMonth] || "";
-      parts = analyticsYearPoints ? null : monthParts(year, selectedMonth);
-    } else {
-      const slots = analyticsSlots();
-      labels = slots.map((slot) => slot.label);
-      flow = [
-        { name: "Доходы", color: "#1d6b45", values: slots.map((slot) => slot.income) },
-        { name: "Расходы", color: "#8d3a32", values: slots.map((slot) => slot.plan) },
-      ];
-      savedSeries = [{ name: "Отложено", color: "#9a6424", values: slots.map((slot) => slot.saved) }];
-      utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: slots.map((slot) => slot.utilities) }];
-      incomeSum = sumNumbers(flow[0].values);
-      planSum = sumNumbers(flow[1].values);
-      savedSum = sumNumbers(savedSeries[0].values);
-      utilitySum = sumNumbers(utilitySeries[0].values);
-    }
+    const years = [...analyticsYears].sort((a, b) => a - b);
+    const marks = [...analyticsMonths];
+    const year = years[0];
+    const selectedMonth = marks[0];
+    const packs = years.map((item) => ({
+      year: item,
+      budget: budgetSeries(item),
+      saved: monthAmounts(item, (key) => savingsTopup(key)),
+      utilities: monthAmounts(item, (key) => utilityTotal(key)),
+    }));
+    const flowOf = (pack) => [
+      { name: "Доходы", color: "#1d6b45", values: pack.budget.income },
+      { name: "Расходы", color: "#8d3a32", values: pack.budget.plan },
+    ];
+    const savedOf = (pack) => [{ name: "Отложено", color: "#9a6424", values: pack.saved }];
+    const utilityOf = (pack) => [{ name: "Коммуналка", color: "#1f4d4a", values: pack.utilities }];
+    const incomeSum = sumNumbers(packs.flatMap((pack) => pack.budget.income));
+    const planSum = sumNumbers(packs.flatMap((pack) => pack.budget.plan));
+    const savedSum = sumNumbers(packs.flatMap((pack) => pack.saved));
+    const utilitySum = sumNumbers(packs.flatMap((pack) => pack.utilities));
+    const monthName = MONTHS_RU[selectedMonth] || "";
+    const parts = single && !analyticsYearPoints ? monthParts(year, selectedMonth) : null;
     const viewNote = single
       ? (analyticsYearPoints
         ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
         : "Ещё раз по выбранному месяцу — график с точками за год.")
-      : "Показаны только отмеченные годы и месяцы.";
-    const scope = single ? `За ${year}` : "За выбранное";
-    const yearChart = (series) => {
-      if (single && analyticsYearPoints) return pointChart(labels, series);
-      if (single) return columnChart(labels, series, selectedMonth);
-      return columnChart(labels, series, -1);
+      : "Тот же график года: отмеченные месяцы выделены.";
+    const scope = years.length === 1 ? `За ${year}` : "За выбранные годы";
+    const periodNote = years.length === 1
+      ? `Общая сумма по месяцам ${year}`
+      : "Общая сумма по выбранным годам";
+    const drawCharts = (seriesOf) => {
+      if (single && analyticsYearPoints) return pointChart(MONTHS_SHORT, seriesOf(packs[0]));
+      return packs.map((pack) => {
+        const caption = years.length > 1 ? `<p class="chart-year">${pack.year}</p>` : "";
+        return `${caption}${columnChart(MONTHS_SHORT, seriesOf(pack), marks)}`;
+      }).join("");
     };
+    const flow = flowOf(packs[0]);
+    const savedSeries = savedOf(packs[0]);
+    const utilitySeries = utilityOf(packs[0]);
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2730,20 +2696,20 @@
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
         <p class="chart-note">${scope}: доходы ${escapeAttr(money(incomeSum))}, расходы ${escapeAttr(money(planSum))}. ${viewNote}</p>
-        ${yearChart(flow)}
+        ${drawCharts(flowOf)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
-        <p class="chart-note">${single ? `Общая сумма по месяцам ${year}` : "Общая сумма"}: ${escapeAttr(money(savedSum))}</p>
-        ${yearChart(savedSeries)}
+        <p class="chart-note">${periodNote}: ${escapeAttr(money(savedSum))}</p>
+        ${drawCharts(savedOf)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
-        <p class="chart-note">${single ? `Общая сумма по месяцам ${year}` : "Общая сумма"}: ${escapeAttr(money(utilitySum))}</p>
-        ${yearChart(utilitySeries)}
+        <p class="chart-note">${periodNote}: ${escapeAttr(money(utilitySum))}</p>
+        ${drawCharts(utilityOf)}
         ${chartLegend(utilitySeries)}
       </article>
     `;

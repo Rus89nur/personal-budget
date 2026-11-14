@@ -1162,6 +1162,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   font-size: 0.84rem;
 }
 
+.chart-year {
+  margin: 0.85rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
