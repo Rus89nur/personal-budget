@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.11.2";
+  const APP_VERSION = "1.12.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -88,6 +88,8 @@
     analyticsYear: document.getElementById("analyticsYear"),
     analyticsMonth: document.getElementById("analyticsMonth"),
     analyticsCharts: document.getElementById("analyticsCharts"),
+    chartStage: document.getElementById("chartStage"),
+    chartTip: document.getElementById("chartTip"),
   };
 
   let seedTemplate = null;
@@ -288,9 +290,8 @@
   function paintSetAsideHint() {
     const hint = document.querySelector("#expenseBody .set-aside-hint");
     if (!hint) return;
-    const text = setAsideHintText();
-    hint.textContent = text;
-    hint.closest("tr")?.setAttribute("title", text);
+    hint.textContent = setAsideHintText();
+    hint.closest("tr")?.removeAttribute("title");
   }
 
   function titheSuggestion(key) {
@@ -363,6 +364,44 @@
     return `${year}-01`;
   }
 
+  function rememberYear(year) {
+    const value = Number(year);
+    if (!Number.isInteger(value) || value < 2000 || value > 2100) return;
+    if (!YEARS.includes(value)) YEARS.push(value);
+    YEARS.sort((a, b) => a - b);
+  }
+
+  function syncYears(target) {
+    Object.keys(target?.years || {}).forEach((key) => rememberYear(key));
+  }
+
+  function ensureYearData(target, year) {
+    rememberYear(year);
+    if (!target.years) target.years = {};
+    if (!target.years[year]) target.years[year] = { months: blankYear(year) };
+    monthKeys(year).forEach((key, index) => {
+      if (!target.years[year].months[key]) target.years[year].months[key] = emptyMonth();
+      stampWorkdays(target.years[year].months[key], year, index);
+    });
+  }
+
+  function selectToday(target) {
+    const now = new Date();
+    const year = now.getFullYear();
+    ensureYearData(target, year);
+    target.year = year;
+    target.months = target.years[year].months;
+    target.currentMonth = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function addNextYear() {
+    const next = Math.max(...YEARS) + 1;
+    ensureYearData(state, next);
+    applySalaryToMonths(state, { silent: true });
+    saveState();
+    render();
+  }
+
   function stampWorkdays(month, year, index) {
     const cal = BudgetCalendar.parts(year, index);
     const prev = month.workdays || {};
@@ -431,6 +470,7 @@
       savedAt: new Date().toISOString(),
     };
     attachYear(next, year);
+    selectToday(next);
     ensureRentStructure(next);
     dropKvFromDecember(next);
     ensureTitheStructure(next);
@@ -543,6 +583,7 @@
         parsed.needsPayroll = true;
       }
       if (!parsed.years) return buildStateFromSeed(seed, true);
+      syncYears(parsed);
       YEARS.forEach((item) => {
         if (!parsed.years[item]) parsed.years[item] = { months: blankYear(item) };
         monthKeys(item).forEach((key, index) => {
@@ -558,6 +599,7 @@
       }
       const year = YEARS.includes(Number(parsed.year)) ? Number(parsed.year) : YEARS[0];
       attachYear(parsed, year);
+      selectToday(parsed);
       return parsed;
     } catch {
       return buildStateFromSeed(seed, true);
@@ -1219,6 +1261,13 @@
       });
       els.yearNav.appendChild(btn);
     });
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "month-chip year-add";
+    add.textContent = "+";
+    add.setAttribute("aria-label", "Добавить следующий год");
+    add.addEventListener("click", () => addNextYear());
+    els.yearNav.appendChild(add);
   }
 
   function renderMonthNav() {
@@ -2216,53 +2265,165 @@
     return `<div class="chart-legend">${series.map((item) => `<span><i style="background:${item.color}"></i>${escapeAttr(item.name)}</span>`).join("")}</div>`;
   }
 
+  function chartAxis(max) {
+    const raw = Math.max(0, Number(max) || 0);
+    if (raw <= 0) return { top: 1, ticks: [0] };
+    const rough = raw / 4;
+    const pow = 10 ** Math.floor(Math.log10(rough));
+    const step = [1, 2, 2.5, 5, 10].map((n) => n * pow).find((n) => n + 1e-9 >= rough) || pow * 10;
+    const count = Math.max(1, Math.ceil(raw / step - 1e-9));
+    const ticks = Array.from({ length: count + 1 }, (_, i) => Math.round(i * step * 100) / 100);
+    return { top: ticks[count], ticks };
+  }
+
+  function axisMoney(n) {
+    const abs = Math.abs(n);
+    if (abs >= 1000000) {
+      const value = abs / 1000000;
+      const text = value >= 10 ? String(Math.round(value)) : String(Math.round(value * 10) / 10).replace(".", ",");
+      return `${n < 0 ? "−" : ""}${text} млн`;
+    }
+    if (abs >= 1000) return `${n < 0 ? "−" : ""}${Math.round(abs / 1000)} тыс.`;
+    return money(n);
+  }
+
+  function chartTipPayload(title, rows) {
+    return escapeAttr(JSON.stringify({
+      title,
+      rows: rows.map((row) => ({
+        name: row.name,
+        value: money(row.value),
+        color: row.color,
+      })),
+    }));
+  }
+
   function columnChart(labels, series, markIndex) {
     const width = 720;
-    const height = 236;
-    const padX = 6;
-    const padTop = 14;
-    const padBottom = 26;
-    const plotW = width - padX * 2;
+    const height = 252;
+    const padLeft = 64;
+    const padRight = 8;
+    const padTop = 12;
+    const padBottom = 28;
+    const plotW = width - padLeft - padRight;
     const plotH = height - padTop - padBottom;
-    const max = Math.max(1, ...series.flatMap((item) => item.values));
+    const rawMax = Math.max(0, ...series.flatMap((item) => item.values.map((n) => Number(n) || 0)));
+    const axis = chartAxis(rawMax);
     const groupW = plotW / labels.length;
-    const inner = groupW * 0.74;
+    const inner = groupW * 0.72;
     const barW = inner / series.length;
+    const yOf = (value) => padTop + plotH - (value / axis.top) * plotH;
+    const grid = axis.ticks.map((tick) => {
+      const y = yOf(tick);
+      return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="rgba(28,27,25,0.14)" />
+        <text x="${padLeft - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#6d6962" font-size="11">${escapeAttr(axisMoney(tick))}</text>`;
+    }).join("");
     const bands = [];
     const bars = [];
+    const hits = [];
     const captions = [];
     labels.forEach((label, index) => {
-      const x0 = padX + index * groupW;
+      const x0 = padLeft + index * groupW;
       if (markIndex === index) {
-        bands.push(`<rect x="${(x0 + 1).toFixed(1)}" y="${padTop}" width="${(groupW - 2).toFixed(1)}" height="${plotH}" rx="8" fill="rgba(28,27,25,0.05)" />`);
+        bands.push(`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${groupW.toFixed(1)}" height="${plotH}" rx="8" fill="rgba(28,27,25,0.05)" />`);
       }
       series.forEach((item, seriesIndex) => {
         const value = Number(item.values[index]) || 0;
-        const barH = (value / max) * (plotH - 6);
+        const barH = (value / axis.top) * plotH;
         const x = x0 + (groupW - inner) / 2 + seriesIndex * barW;
         const y = padTop + plotH - barH;
         const fade = markIndex >= 0 && markIndex !== index ? 0.32 : 1;
-        bars.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 3, 2).toFixed(1)}" height="${(value > 0 ? Math.max(barH, 2) : 0).toFixed(1)}" rx="3" fill="${item.color}" opacity="${fade}"><title>${escapeAttr(label)} · ${escapeAttr(item.name)}: ${escapeAttr(money(value))}</title></rect>`);
+        bars.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 3, 2).toFixed(1)}" height="${(value > 0 ? Math.max(barH, 1.5) : 0).toFixed(1)}" rx="3" fill="${item.color}" opacity="${fade}" />`);
       });
-      captions.push(`<text x="${(x0 + groupW / 2).toFixed(1)}" y="${height - 7}" text-anchor="middle" fill="#6d6962" font-size="11">${escapeAttr(label)}</text>`);
+      hits.push(`<rect class="chart-hit" x="${x0.toFixed(1)}" y="${padTop}" width="${groupW.toFixed(1)}" height="${plotH}" fill="transparent" data-chart-tip="${chartTipPayload(label, series.map((item) => ({ name: item.name, value: Number(item.values[index]) || 0, color: item.color })))}" />`);
+      captions.push(`<text x="${(x0 + groupW / 2).toFixed(1)}" y="${height - 8}" text-anchor="middle" fill="#6d6962" font-size="11">${escapeAttr(label)}</text>`);
     });
-    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Столбчатый график">${bands.join("")}${bars.join("")}${captions.join("")}</svg>`;
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Столбчатый график">${grid}${bands.join("")}${bars.join("")}${captions.join("")}${hits.join("")}</svg>`;
   }
 
   function rowChart(items, color) {
     if (!items.length) return `<p class="chart-empty">Нет сумм за этот месяц</p>`;
     const width = 520;
     const rowH = 28;
-    const height = items.length * rowH + 4;
     const labelW = 138;
-    const max = Math.max(1, ...items.map((item) => item.value));
+    const axis = chartAxis(Math.max(...items.map((item) => item.value)));
+    const plotW = width - labelW - 10;
+    const axisH = 22;
+    const height = items.length * rowH + axisH;
     const rows = items.map((item, index) => {
       const y = index * rowH;
-      const barW = ((width - labelW - 12) * item.value) / max;
+      const barW = (plotW * item.value) / axis.top;
       const name = item.label.length > 16 ? `${item.label.slice(0, 15)}…` : item.label;
-      return `<text x="0" y="${y + 18}" fill="#3f3c37" font-size="12"><title>${escapeAttr(item.label)}: ${escapeAttr(money(item.value))}</title>${escapeAttr(name)}</text><rect x="${labelW}" y="${y + 6}" width="${Math.max(barW, 2).toFixed(1)}" height="14" rx="4" fill="${color}"><title>${escapeAttr(money(item.value))}</title></rect>`;
+      return `<text x="0" y="${y + 18}" fill="#3f3c37" font-size="12">${escapeAttr(name)}</text>
+        <rect x="${labelW}" y="${y + 6}" width="${Math.max(barW, 1.5).toFixed(1)}" height="14" rx="4" fill="${color}" />
+        <rect class="chart-hit" x="0" y="${y}" width="${width}" height="${rowH}" fill="transparent" data-chart-tip="${chartTipPayload(item.label, [{ name: "Сумма", value: item.value, color }])}" />`;
     }).join("");
-    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}</svg>`;
+    const ticks = axis.ticks.map((tick) => {
+      const x = labelW + (plotW * tick) / axis.top;
+      const anchor = tick === 0 ? "start" : tick === axis.top ? "end" : "middle";
+      return `<line x1="${x.toFixed(1)}" y1="${height - axisH}" x2="${x.toFixed(1)}" y2="${height - axisH + 4}" stroke="rgba(28,27,25,0.28)" />
+        <text x="${x.toFixed(1)}" y="${height - 4}" text-anchor="${anchor}" fill="#6d6962" font-size="11">${escapeAttr(axisMoney(tick))}</text>`;
+    }).join("");
+    const baseline = `<line x1="${labelW}" y1="${height - axisH}" x2="${labelW + plotW}" y2="${height - axisH}" stroke="rgba(28,27,25,0.18)" />`;
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}${baseline}${ticks}</svg>`;
+  }
+
+  function paintChartTip(data) {
+    els.chartTip.replaceChildren();
+    const title = document.createElement("strong");
+    title.textContent = data.title;
+    els.chartTip.appendChild(title);
+    data.rows.forEach((row) => {
+      const line = document.createElement("span");
+      const name = document.createElement("b");
+      const swatch = document.createElement("i");
+      swatch.style.background = row.color;
+      name.append(swatch, document.createTextNode(row.name));
+      const value = document.createElement("em");
+      value.textContent = row.value;
+      line.append(name, value);
+      els.chartTip.appendChild(line);
+    });
+  }
+
+  function placeChartTip(event) {
+    const box = els.chartStage.getBoundingClientRect();
+    const tip = els.chartTip;
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
+    const tipW = tip.offsetWidth;
+    const tipH = tip.offsetHeight;
+    let left = x + 14;
+    let top = y - tipH - 12;
+    if (left + tipW > box.width - 6) left = Math.max(6, x - tipW - 14);
+    if (top < 4) top = y + 16;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  }
+
+  function bindChartTips() {
+    if (!els.chartStage || els.chartStage.dataset.tips) return;
+    const show = (event) => {
+      const hit = event.target.closest?.("[data-chart-tip]");
+      if (!hit || !els.chartStage.contains(hit)) {
+        els.chartTip.hidden = true;
+        return;
+      }
+      try {
+        paintChartTip(JSON.parse(hit.getAttribute("data-chart-tip")));
+      } catch {
+        els.chartTip.hidden = true;
+        return;
+      }
+      els.chartTip.hidden = false;
+      placeChartTip(event);
+    };
+    els.chartStage.addEventListener("pointermove", show);
+    els.chartStage.addEventListener("pointerdown", show);
+    els.chartStage.addEventListener("pointerleave", () => {
+      els.chartTip.hidden = true;
+    });
+    els.chartStage.dataset.tips = "1";
   }
 
   function renderAnalyticsNav() {
@@ -2299,6 +2460,7 @@
 
   function renderAnalytics() {
     if (!els.analyticsCharts || !state) return;
+    bindChartTips();
     renderAnalyticsNav();
     const year = analyticsYear;
     const selectedMonth = analyticsMonth;
