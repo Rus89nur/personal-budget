@@ -614,19 +614,24 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 }
 
 .month-nav {
-  display: flex;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.15rem 0 0.35rem;
-  scrollbar-width: thin;
-  scroll-snap-type: x proximity;
+  overflow: visible;
 }
 
 .month-nav .month-chip {
-  scroll-snap-align: start;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  padding: 0.55rem 0.2rem;
+  font-size: 0.82rem;
+  letter-spacing: -0.01em;
+  text-align: center;
 }
 
 .sheet-top {
@@ -1434,6 +1439,16 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 @media (max-width: 720px) {
   .burger-label { display: none; }
   .month-title { align-self: flex-start; }
+
+  .month-nav {
+    gap: 0.3rem;
+  }
+
+  .month-nav .month-chip {
+    min-height: var(--tap);
+    padding: 0.45rem 0.1rem;
+    font-size: 0.78rem;
+  }
 }
 
 @media (max-width: 860px) {
