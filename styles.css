@@ -1441,13 +1441,14 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   .month-title { align-self: flex-start; }
 
   .month-nav {
-    gap: 0.3rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
   }
 
   .month-nav .month-chip {
     min-height: var(--tap);
-    padding: 0.45rem 0.1rem;
-    font-size: 0.78rem;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.84rem;
   }
 }
 
