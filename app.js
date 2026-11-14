@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.13.0";
+  const APP_VERSION = "1.13.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1348,6 +1348,13 @@
       });
       els.monthNav.appendChild(btn);
     });
+    requestAnimationFrame(() => {
+      els.monthNav?.querySelector(".month-chip.active")?.scrollIntoView({
+        inline: "center",
+        block: "nearest",
+        behavior: "auto",
+      });
+    });
   }
 
   function unlockPayroll(month, kinds) {
@@ -2649,7 +2656,7 @@
       [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
         markFresh(selector, index);
       });
-      document.querySelector(".month-chip.active")?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+      els.monthNav?.querySelector(".month-chip.active")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
     }
   }
 
