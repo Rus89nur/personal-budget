@@ -873,34 +873,6 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   cursor: default;
 }
 
-.rent-open {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 0.45rem 0.75rem;
-  font: inherit;
-  font-weight: 650;
-  text-align: left;
-  color: var(--ink);
-  background: rgba(29, 107, 69, 0.08);
-  cursor: pointer;
-}
-
-.rent-open small {
-  font-size: 0.72rem;
-  font-weight: 650;
-  color: var(--muted);
-}
-
-.rent-row .num-input[readonly] {
-  cursor: pointer;
-  background: rgba(29, 107, 69, 0.08);
-}
-
 .rent-dialog {
   max-width: min(480px, calc(100vw - 1.5rem));
 }

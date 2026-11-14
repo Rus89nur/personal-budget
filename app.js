@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.1";
+  const APP_VERSION = "1.4.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -455,13 +455,6 @@
     return row;
   }
 
-  function rentCaption(row) {
-    const lines = row?.lines || [];
-    if (!lines.length) return "добавить";
-    const active = lines.filter((line) => line.active !== false).length;
-    return `${active} из ${lines.length}`;
-  }
-
   function placeRentRow(month, row) {
     const kv = month.income.findIndex((item) => /^кв$/i.test(String(item.label || "").trim()));
     if (kv >= 0) {
@@ -561,8 +554,6 @@
     if (!row) return;
     const amount = document.querySelector("#incomeBody [data-rent-amount]");
     if (amount) amount.value = formatEditable(row.amount);
-    const meta = document.querySelector("#incomeBody [data-rent-meta]");
-    if (meta) meta.textContent = rentCaption(row);
     refreshTotalsOnly();
   }
 
@@ -1063,20 +1054,14 @@
       const tr = document.createElement("tr");
       const rent = isRentRow(row);
       if (payroll) tr.classList.add("payroll-derived");
-      if (rent) tr.classList.add("rent-row");
       if (animateRows) {
         tr.classList.add("row-in");
         tr.style.animationDelay = `${Math.min(index, 8) * 0.045}s`;
       }
       if (rent) {
         tr.innerHTML = `
-          <td>
-            <button type="button" class="rent-open" data-act="rent">
-              <span>Аренда</span>
-              <small data-rent-meta>${escapeAttr(rentCaption(row))}</small>
-            </button>
-          </td>
-          <td class="num"><input class="num-input" type="text" readonly value="${formatEditable(row.amount)}" data-rent-amount title="Состав аренды" /></td>
+          <td><input class="name-input" type="text" value="Аренда" data-act="rent" readonly /></td>
+          <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="Состав аренды" /></td>
           <td class="actions-col"></td>
         `;
         tr.querySelector("[data-act=rent]").addEventListener("click", openRentMenu);
