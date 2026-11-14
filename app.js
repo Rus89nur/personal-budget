@@ -1544,5 +1544,4 @@
 
   watchForUpdate();
   boot();
-  window.__budget = { get state() { return state; }, suggestionFor, cellValue, previousExpenseMonth };
 })();
