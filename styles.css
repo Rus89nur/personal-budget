@@ -841,15 +841,29 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   color: rgba(28, 27, 25, 0.45);
 }
 
-.expense-panel .remain-label {
-  font-size: 0.78rem;
+.expense-panel #expenseFoot th {
+  color: var(--ink);
+  background: #fff;
   font-weight: 700;
-  color: var(--ink-soft);
 }
 
+.expense-panel #expenseFoot th:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.expense-panel #expenseFoot th:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.expense-panel .remain-label,
 .expense-panel .remain-value {
-  font-size: 0.82rem;
-  font-weight: 650;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.expense-panel .remain-value.delta-neg {
+  color: var(--expense);
 }
 
 .expense-panel .data-table input.is-inherited {
@@ -884,6 +898,38 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: rgba(31, 77, 74, 0.06);
   color: var(--ink-soft);
   cursor: default;
+}
+
+.rent-row td:first-child {
+  position: relative;
+}
+
+.rent-row input {
+  cursor: pointer;
+}
+
+.rent-hint {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  z-index: 4;
+  padding: 0.22rem 0.5rem;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #f7f4ee;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease;
+}
+
+.rent-row:hover .rent-hint,
+.rent-row:focus-within .rent-hint {
+  opacity: 1;
 }
 
 .rent-dialog {
