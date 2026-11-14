@@ -535,10 +535,17 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 
 .layout {
   width: min(var(--max), calc(100% - var(--pad) * 2));
+  max-width: 100%;
   margin: 0 auto;
   padding: 2.2rem 0 3.5rem;
   display: grid;
   gap: 1rem;
+  min-width: 0;
+}
+
+.layout > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .year-nav {
@@ -726,6 +733,9 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid var(--line);
   transition: transform 0.45s var(--ease);
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .month-head.is-fresh,
@@ -844,9 +854,14 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 }
 
 .table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
 }
 
 .expense-panel .data-table input.delta-neg {
@@ -1101,6 +1116,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   align-items: stretch;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chart-card {
@@ -1370,8 +1387,35 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
     grid-template-columns: 1fr;
   }
 
+  .panel {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+
   .data-table {
-    min-width: 460px;
+    min-width: 0;
+  }
+
+  .income-panel .data-table {
+    min-width: 0;
+  }
+
+  .expense-panel .data-table {
+    min-width: 36rem;
+  }
+
+  .data-table input.num-input {
+    min-width: 4.6rem;
+  }
+
+  .data-table input.name-input {
+    min-width: 7rem;
+  }
+
+  .expense-panel .data-table th,
+  .expense-panel .data-table td {
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
   }
 
   .settings-dialog,
