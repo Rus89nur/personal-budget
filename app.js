@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.3.6";
+  const APP_VERSION = "1.3.7";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -145,7 +145,9 @@
   function incomeColumns(month) {
     return month.income.map((row) => ({
       key: incomeColumnKey(row),
+      id: row.id,
       label: row.label,
+      amount: Number(row.amount) || 0,
     }));
   }
 
@@ -793,17 +795,18 @@
 
   function renderExpenses(month) {
     const columns = incomeColumns(month);
+    const incomeTotal = month.income.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
     els.expenseHead.innerHTML = `
       <tr>
         <th>Категория</th>
         <th class="num">
           <span class="col-title">План</span>
-          <span class="col-sum" data-sum="plan">${money(columnSum(month, "plan"))}</span>
+          <span class="col-sum" data-sum="plan">${money(incomeTotal)}</span>
         </th>
         ${columns.map((col) => `
           <th class="num">
             <span class="col-title">${escapeAttr(col.label)}</span>
-            <span class="col-sum" data-sum="${escapeAttr(col.key)}">${money(columnSum(month, col.key))}</span>
+            <span class="col-sum" data-income-id="${escapeAttr(col.id)}">${money(col.amount)}</span>
           </th>
         `).join("")}
         <th class="actions-col"></th>
@@ -867,8 +870,10 @@
     paintText(els.sumRemain, money(t.remain));
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
-    document.querySelectorAll("#expenseHead [data-sum]").forEach((node) => {
-      paintText(node, money(columnSum(month, node.dataset.sum)));
+    paintText(document.querySelector('#expenseHead [data-sum="plan"]'), money(t.income));
+    month.income.forEach((row) => {
+      const node = document.querySelector(`#expenseHead [data-income-id="${CSS.escape(row.id)}"]`);
+      if (node) paintText(node, money(Number(row.amount) || 0));
     });
   }
 
