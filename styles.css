@@ -809,7 +809,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .expense-panel tbody tr:hover td {
-  background: #fff;
+  background: rgba(28, 27, 25, 0.06);
 }
 
 .expense-panel tbody tr:hover td:first-child {
