@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.11.0";
+  const APP_VERSION = "1.11.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2168,7 +2168,8 @@
     node.classList.toggle("delta-neg", value < 0);
   }
 
-  let analyticsReady = false;
+  let analyticsYear = null;
+  let analyticsMonth = null;
 
   function yearMonth(year, index) {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
@@ -2264,35 +2265,43 @@
     return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}</svg>`;
   }
 
-  function bindAnalytics() {
-    if (analyticsReady || !els.analyticsYear || !els.analyticsMonth) return;
+  function renderAnalyticsNav() {
+    if (!els.analyticsYear || !els.analyticsMonth) return;
+    if (analyticsYear == null) analyticsYear = state.year;
+    if (analyticsMonth == null) analyticsMonth = monthIndex(state.currentMonth);
+    els.analyticsYear.innerHTML = "";
     YEARS.forEach((year) => {
-      const option = document.createElement("option");
-      option.value = String(year);
-      option.textContent = String(year);
-      els.analyticsYear.appendChild(option);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `month-chip${year === analyticsYear ? " active" : ""}`;
+      btn.textContent = String(year);
+      btn.setAttribute("aria-pressed", year === analyticsYear ? "true" : "false");
+      btn.addEventListener("click", () => {
+        analyticsYear = year;
+        renderAnalytics();
+      });
+      els.analyticsYear.appendChild(btn);
     });
-    const all = document.createElement("option");
-    all.value = "";
-    all.textContent = "Все месяцы";
-    els.analyticsMonth.appendChild(all);
-    MONTHS_RU.forEach((name, index) => {
-      const option = document.createElement("option");
-      option.value = String(index);
-      option.textContent = name;
-      els.analyticsMonth.appendChild(option);
+    els.analyticsMonth.innerHTML = "";
+    MONTHS_SHORT.forEach((name, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `month-chip${index === analyticsMonth ? " active" : ""}`;
+      btn.textContent = name;
+      btn.setAttribute("aria-pressed", index === analyticsMonth ? "true" : "false");
+      btn.addEventListener("click", () => {
+        analyticsMonth = index;
+        renderAnalytics();
+      });
+      els.analyticsMonth.appendChild(btn);
     });
-    els.analyticsYear.value = String(state.year);
-    els.analyticsYear.addEventListener("change", () => renderAnalytics());
-    els.analyticsMonth.addEventListener("change", () => renderAnalytics());
-    analyticsReady = true;
   }
 
   function renderAnalytics() {
     if (!els.analyticsCharts || !state) return;
-    bindAnalytics();
-    const year = Number(els.analyticsYear.value) || state.year;
-    const monthIndex = els.analyticsMonth.value === "" ? -1 : Number(els.analyticsMonth.value);
+    renderAnalyticsNav();
+    const year = analyticsYear;
+    const selectedMonth = analyticsMonth;
     const budget = budgetSeries(year);
     const saved = monthAmounts(year, (key) => savingsTopup(key));
     const utilities = monthAmounts(year, (key) => utilityTotal(key));
@@ -2302,8 +2311,8 @@
     ];
     const savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
     const utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
-    const monthName = monthIndex >= 0 ? MONTHS_RU[monthIndex] : "";
-    const parts = monthIndex >= 0 ? monthParts(year, monthIndex) : null;
+    const monthName = MONTHS_RU[selectedMonth] || "";
+    const parts = monthParts(year, selectedMonth);
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2320,20 +2329,20 @@
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
         <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}</p>
-        ${columnChart(MONTHS_SHORT, flow, monthIndex)}
+        ${columnChart(MONTHS_SHORT, flow, selectedMonth)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(saved)))}</p>
-        ${columnChart(MONTHS_SHORT, savedSeries, monthIndex)}
+        ${columnChart(MONTHS_SHORT, savedSeries, selectedMonth)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(utilities)))}</p>
-        ${columnChart(MONTHS_SHORT, utilitySeries, monthIndex)}
+        ${columnChart(MONTHS_SHORT, utilitySeries, selectedMonth)}
         ${chartLegend(utilitySeries)}
       </article>
     `;
