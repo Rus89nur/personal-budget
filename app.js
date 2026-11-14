@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.14.1";
+  const APP_VERSION = "1.15.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -93,6 +93,7 @@
   };
 
   let seedTemplate = null;
+  let sheetBudget = null;
   let state = null;
   let settingsDraftOklad = null;
   let rentMenuKey = null;
@@ -171,10 +172,14 @@
   }
 
   function incomeColumnKey(row) {
-    if (isSalaryLabel(row.label)) return "salary";
-    if (isAdvanceLabel(row.label)) return "advance";
-    if (isVacationLabel(row.label)) return "vacation";
-    return `name:${String(row.label || "").trim().toLowerCase()}`;
+    return shareKeyForLabel(row.label);
+  }
+
+  function shareKeyForLabel(label) {
+    if (isSalaryLabel(label)) return "salary";
+    if (isAdvanceLabel(label)) return "advance";
+    if (isVacationLabel(label)) return "vacation";
+    return `name:${String(label || "").trim().toLowerCase()}`;
   }
 
   function incomeColumns(month) {
@@ -611,6 +616,44 @@
         delete row.sharesManual[key];
       });
     });
+  }
+
+  function applySheetBudget(target, sheet) {
+    if (!sheet || target.sheetBudgetThrough === "2026-10") return false;
+    const year = target.years?.[2026];
+    if (!year?.months) return false;
+    Object.entries(sheet).forEach(([key, spec]) => {
+      const month = year.months[key];
+      if (!month || !spec) return;
+      const rent = (month.income || []).find(isRentRow);
+      month.income = (spec.income || []).map((row, index) => ({
+        id: `inc-${key}-${index}`,
+        label: String(row.label || "Прочее"),
+        amount: Number(row.amount) || 0,
+        manual: true,
+      }));
+      if (rent) placeRentRow(month, rent);
+      month.expenses = (spec.expenses || []).map((row, index) => {
+        const shares = {};
+        const sharesManual = {};
+        (row.cells || []).forEach((cell) => {
+          const shareKey = shareKeyForLabel(cell.label);
+          shares[shareKey] = cell.amount;
+          sharesManual[shareKey] = true;
+        });
+        return {
+          id: `exp-${key}-${index}`,
+          name: String(row.name || "Прочее"),
+          plan: row.plan == null ? null : Number(row.plan),
+          planManual: row.plan != null,
+          shares,
+          sharesManual,
+        };
+      });
+    });
+    ensureTitheStructure(target);
+    target.sheetBudgetThrough = "2026-10";
+    return true;
   }
 
   function applySheetNovemberCosts(target) {
@@ -1127,7 +1170,7 @@
           const vacationRow = ensureIncomeRow(month, "vacation", "Отпускные");
           writeAmount(vacationRow, own.vacation, force);
         } else {
-          month.income = month.income.filter((row) => !isVacationLabel(row.label));
+          month.income = month.income.filter((row) => !isVacationLabel(row.label) || row.manual);
         }
         dedupePayrollRows(month);
       });
@@ -2831,6 +2874,9 @@
   function resetFromTable() {
     if (!confirm("Вернуть все месяцы к цифрам из таблицы Бюджет_2026?")) return;
     state = buildStateFromSeed(seedTemplate, true);
+    delete state.sheetBudgetThrough;
+    delete state.needsPayroll;
+    applySheetBudget(state, sheetBudget);
     saveState();
     render();
   }
@@ -2963,9 +3009,13 @@
   async function boot() {
     clearStaleCaches();
     try {
-      const res = await fetch(`./seed-data.json?v=${APP_VERSION}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("seed missing");
-      seedTemplate = await res.json();
+      const [seedRes, sheetRes] = await Promise.all([
+        fetch(`./seed-data.json?v=${APP_VERSION}`, { cache: "no-store" }),
+        fetch(`./sheet-budget-2026.json?v=${APP_VERSION}`, { cache: "no-store" }),
+      ]);
+      if (!seedRes.ok) throw new Error("seed missing");
+      seedTemplate = await seedRes.json();
+      if (sheetRes.ok) sheetBudget = await sheetRes.json();
     } catch {
       seedTemplate = { version: 3, year: state?.year || 2026, months: {} };
     }
@@ -2983,11 +3033,11 @@
       Object.values(state.years[year].months).forEach((month) => {
         if (month.workdays?.vacationOn) return;
         const before = month.income.length;
-        month.income = month.income.filter((row) => !isVacationLabel(row.label));
+        month.income = month.income.filter((row) => !isVacationLabel(row.label) || row.manual);
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || ensureSavingsFact(state) || ensureUtilities(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || ensureSavingsFact(state) || ensureUtilities(state)) saveState();
     render();
   }
 
