@@ -1089,6 +1089,10 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   cursor: default;
 }
 
+.savings-table .num-input[readonly] {
+  color: var(--ink-soft);
+}
+
 .rent-row td:first-child,
 .set-aside-row td:first-child {
   position: relative;

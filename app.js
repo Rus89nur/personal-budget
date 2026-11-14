@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.9.0";
+  const APP_VERSION = "1.9.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1841,21 +1841,25 @@
     return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
   }
 
-  function savingsCell(row, monthKey) {
+  function savingsCell(row, monthKey, editable) {
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
-    if (row.calc) return readCell(shown);
+    if (row.calc || !editable) return readCell(shown);
     return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
   function renderSavings() {
     if (!els.savingsHead || !els.savingsBody || !state.savingsFact) return;
     const key = state.currentMonth;
-    const months = [previousMonthKey(previousMonthKey(key)), previousMonthKey(key), key];
+    const months = [
+      { key: previousMonthKey(previousMonthKey(key)), editable: false },
+      { key: previousMonthKey(key), editable: false },
+      { key, editable: true },
+    ];
     els.savingsHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        ${months.map((monthKey) => `<th class="num"><span class="col-title">${escapeAttr(monthChip(monthKey))}</span></th>`).join("")}
+        ${months.map((month) => `<th class="num"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
       </tr>
     `;
     els.savingsBody.innerHTML = "";
@@ -1864,7 +1868,7 @@
       if (row.calc) tr.classList.add("is-total");
       tr.innerHTML = `
         <td>${nameCell(row.name)}</td>
-        ${months.map((monthKey) => `<td class="num">${savingsCell(row, monthKey)}</td>`).join("")}
+        ${months.map((month) => `<td class="num">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
       `;
       tr.querySelectorAll("input:not([readonly])").forEach((input) => {
         input.addEventListener("change", () => {
