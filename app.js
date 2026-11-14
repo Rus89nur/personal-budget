@@ -1,8 +1,15 @@
 (() => {
-  const APP_VERSION = "1.8.2";
+  const APP_VERSION = "1.8.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
+  const COARSE_POINTER = window.matchMedia("(pointer: coarse)").matches
+    || ("ontouchstart" in window && navigator.maxTouchPoints > 0);
+  const IOS_WEBKIT = /iP(ad|hone|od)/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  let bodyScrollY = 0;
+  let focusScrollTimer = 0;
 
   const MONTHS_RU = [
     "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -783,8 +790,12 @@
     paintRentRow();
     renderRentMenu();
     const names = els.rentList.querySelectorAll(".name-input");
-    names[names.length - 1]?.focus();
-    names[names.length - 1]?.select();
+    const last = names[names.length - 1];
+    if (last) {
+      last.focus({ preventScroll: true });
+      selectField(last);
+      scrollFieldIntoView(last);
+    }
   }
 
   function removeRentLine(fromKey, lineId) {
@@ -812,8 +823,8 @@
       item.className = `rent-line${line.active ? "" : " is-off"}`;
       item.innerHTML = `
         <input type="checkbox" aria-label="Учитывать в доходе" ${line.active ? "checked" : ""} />
-        <input class="name-input" type="text" value="${escapeAttr(line.label)}" aria-label="Название" />
-        <input class="num-input" type="text" inputmode="decimal" value="${formatEditable(line.amount)}" aria-label="Сумма" />
+        <input class="name-input" type="text" value="${escapeAttr(line.label)}" aria-label="Название" autocomplete="off" />
+        <input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${formatEditable(line.amount)}" aria-label="Сумма" autocomplete="off" autocorrect="off" spellcheck="false" />
         <button type="button" class="icon-x" aria-label="Удалить строку">×</button>
       `;
       const [check, name, amount, remove] = item.children;
@@ -834,13 +845,22 @@
     } else {
       els.rentDialog.setAttribute("open", "");
     }
-    els.rentList.querySelector(".num-input")?.focus();
+    syncDialogScrollLock();
+    const firstAmount = els.rentList.querySelector(".num-input");
+    if (firstAmount) {
+      queueMicrotask(() => {
+        firstAmount.focus({ preventScroll: true });
+        selectField(firstAmount);
+        scrollFieldIntoView(firstAmount);
+      });
+    }
   }
 
   function closeRentMenu() {
     rentMenuKey = null;
     if (typeof els.rentDialog.close === "function" && els.rentDialog.open) els.rentDialog.close();
     else els.rentDialog.removeAttribute("open");
+    syncDialogScrollLock();
   }
 
   function dedupePayrollRows(month) {
@@ -1002,18 +1022,93 @@
       && (el.classList.contains("num-input") || el.inputMode === "numeric" || el.inputMode === "decimal");
   }
 
+  function selectField(input) {
+    if (!(input instanceof HTMLInputElement) || input.readOnly) return;
+    const run = () => {
+      try {
+        const len = input.value.length;
+        if (typeof input.setSelectionRange === "function") input.setSelectionRange(0, len);
+        else input.select();
+      } catch {
+        /* iOS может отклонить select, пока клавиатура ещё поднимается */
+      }
+    };
+    if (IOS_WEBKIT || COARSE_POINTER) {
+      window.setTimeout(run, 10);
+      return;
+    }
+    run();
+  }
+
+  function scrollFieldIntoView(el) {
+    if (!(el instanceof HTMLElement)) return;
+    window.clearTimeout(focusScrollTimer);
+    focusScrollTimer = window.setTimeout(() => {
+      const topbar = document.querySelector(".topbar");
+      const topPad = (topbar ? topbar.getBoundingClientRect().height : 56) + 12;
+      const vv = window.visualViewport;
+      const viewTop = vv ? vv.offsetTop : 0;
+      const viewH = vv ? vv.height : window.innerHeight;
+      const rect = el.getBoundingClientRect();
+      const above = rect.top < viewTop + topPad;
+      const below = rect.bottom > viewTop + viewH - 24;
+      if (!above && !below) return;
+      try {
+        el.scrollIntoView({ block: above ? "start" : "end", inline: "nearest", behavior: "smooth" });
+      } catch {
+        el.scrollIntoView(true);
+      }
+    }, IOS_WEBKIT ? 280 : 80);
+  }
+
+  function lockBodyScroll() {
+    if (document.body.classList.contains("is-dialog-open")) return;
+    bodyScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.classList.add("is-dialog-open");
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${bodyScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+  }
+
+  function unlockBodyScroll() {
+    if (!document.body.classList.contains("is-dialog-open")) return;
+    document.body.classList.remove("is-dialog-open");
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.width = "";
+    window.scrollTo(0, bodyScrollY);
+  }
+
+  function syncDialogScrollLock() {
+    const open = Boolean(
+      (els.settingsDialog && els.settingsDialog.open)
+      || (els.rentDialog && els.rentDialog.open)
+    );
+    if (open) lockBodyScroll();
+    else unlockBodyScroll();
+  }
+
   document.addEventListener("focusin", (event) => {
-    const input = event.target;
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      scrollFieldIntoView(target);
+    }
+    const input = target;
     if (!isNumericField(input)) return;
     if (!isPlainZero(input.value)) {
       delete input.dataset.zeroArmed;
       return;
     }
     input.dataset.zeroArmed = "1";
-    input.select();
+    selectField(input);
   });
 
   document.addEventListener("mouseup", (event) => {
+    if (COARSE_POINTER || event.detail === 0) return;
     const input = event.target;
     if (!isNumericField(input) || input.dataset.zeroArmed !== "1") return;
     event.preventDefault();
@@ -1027,7 +1122,7 @@
       if (input.closest("#expenseTable, #savingsTable, #utilitiesTable")) return;
       input.value = "0";
       input.dataset.zeroArmed = "1";
-      input.select();
+      selectField(input);
       return;
     }
     if (input.dataset.zeroArmed === "1" && /^0\d/.test(raw)) input.value = raw.slice(1);
@@ -1224,9 +1319,11 @@
     } else {
       els.settingsDialog.setAttribute("open", "");
     }
+    syncDialogScrollLock();
     queueMicrotask(() => {
-      els.settingsOklad.focus();
-      els.settingsOklad.select();
+      els.settingsOklad.focus({ preventScroll: true });
+      selectField(els.settingsOklad);
+      scrollFieldIntoView(els.settingsOklad);
     });
   }
 
@@ -1236,6 +1333,7 @@
     } else {
       els.settingsDialog.removeAttribute("open");
     }
+    syncDialogScrollLock();
   }
 
   function commitSettings() {
@@ -1304,7 +1402,7 @@
       }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payroll ? "readonly" : ""} /></td>
-        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" title="${payroll ? "Можно поправить вручную" : ""}" /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${formatEditable(row.amount)}" data-field="amount" title="${payroll ? "Можно поправить вручную" : ""}" autocomplete="off" autocorrect="off" spellcheck="false" /></td>
         <td class="actions-col">${payroll ? "" : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`}</td>
       `;
       const labelInput = tr.querySelector('[data-field="label"]');
@@ -1337,7 +1435,7 @@
   function shareInput(row, key) {
     const value = cellValue(row, key);
     const shown = value == null ? "" : formatEditable(value);
-    return `<input class="num-input" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" />`;
+    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
   function writeExpenseCell(row, key, parsed) {
@@ -1469,10 +1567,10 @@
           input.dataset.pending = "1";
           input.classList.add("is-suggestion");
           arming = false;
-          requestAnimationFrame(() => input.select());
+          requestAnimationFrame(() => selectField(input));
         });
 
-        input.addEventListener("mousedown", (event) => {
+        input.addEventListener("pointerdown", (event) => {
           if (document.activeElement !== input || input.dataset.pending !== "1") return;
           event.preventDefault();
           commitCell(parseNumber(input.value));
@@ -1709,7 +1807,7 @@
       const current = row.calc ? savingsCalc(row.calc, key) : savingsStored(row.id, key);
       const currentCell = row.calc
         ? readCell(current == null ? "" : formatEditable(current))
-        : `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`;
+        : `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
       tr.innerHTML = `
         <td>${nameCell(row.name)}</td>
         <td class="num">${currentCell}</td>
@@ -1832,7 +1930,7 @@
       const previous = currentOf(prevKey);
       const view = compareView(current, previous);
       const currentCell = editableId
-        ? `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`
+        ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
         : readCell(view.currentText);
       tr.innerHTML = `
         <td>${nameCell(title)}</td>
@@ -2033,12 +2131,17 @@
     e.preventDefault();
     closeSettings();
   });
+  els.settingsDialog.addEventListener("close", syncDialogScrollLock);
+  els.settingsDialog.addEventListener("click", (e) => {
+    if (e.target === els.settingsDialog) closeSettings();
+  });
   document.getElementById("rentDialogClose").addEventListener("click", closeRentMenu);
   els.rentAdd.addEventListener("click", () => addRentLine(rentMenuKey || state.currentMonth));
   els.rentDialog.addEventListener("cancel", (e) => {
     e.preventDefault();
     closeRentMenu();
   });
+  els.rentDialog.addEventListener("close", syncDialogScrollLock);
   els.rentDialog.addEventListener("click", (e) => {
     if (e.target === els.rentDialog) closeRentMenu();
   });

@@ -20,6 +20,12 @@
   --max: 1120px;
   --pad: clamp(1.25rem, 4vw, 3.5rem);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --tap: 44px;
+  --field-fs: 16px;
 }
 
 *,
@@ -30,16 +36,41 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   font-family: var(--font-body);
   color: var(--ink);
   background: var(--paper);
   line-height: 1.45;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+body.is-dialog-open {
+  overflow: hidden;
+  touch-action: none;
+}
+
+a,
+button,
+.btn,
+.cta,
+.month-chip,
+.icon-x,
+.burger,
+.nav-action,
+.col-fill,
+label,
+summary {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(28, 27, 25, 0.08);
 }
 
 .nav-toggle {
@@ -57,7 +88,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.1rem var(--pad);
+  min-height: calc(var(--tap) + 0.5rem);
+  padding: calc(0.85rem + var(--safe-top)) max(var(--pad), var(--safe-right)) 0.85rem max(var(--pad), var(--safe-left));
   color: var(--cream);
   transition: background 0.45s var(--ease), color 0.45s var(--ease), backdrop-filter 0.45s var(--ease);
 }
@@ -88,7 +120,10 @@ body {
 .burger {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.65rem;
+  min-width: var(--tap);
+  min-height: var(--tap);
   cursor: pointer;
   font-size: 0.75rem;
   letter-spacing: 0.14em;
@@ -146,9 +181,10 @@ body:has(#navToggle:checked) .burger-icon::after {
   flex-direction: column;
   justify-content: center;
   gap: 0.2rem;
-  padding: 6rem var(--pad);
+  padding: calc(6rem + var(--safe-top)) max(var(--pad), var(--safe-right)) calc(2rem + var(--safe-bottom)) max(var(--pad), var(--safe-left));
   background: #161412;
   color: var(--cream);
+  overscroll-behavior: contain;
 }
 
 body:has(#navToggle:checked) .nav { display: flex; }
@@ -298,6 +334,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   appearance: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
   height: 3.25rem;
   margin-top: 1.6rem;
   padding: 0 1.35rem;
@@ -317,6 +355,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   appearance: none;
   border: 1px solid transparent;
   border-radius: 999px;
+  min-height: var(--tap);
   padding: 0.65rem 1.05rem;
   font: inherit;
   font-weight: 650;
@@ -334,7 +373,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .btn-small {
-  padding: 0.45rem 0.85rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.95rem;
   font-size: 0.9rem;
   border-color: var(--line);
   background: rgba(255, 255, 255, 0.7);
@@ -355,9 +395,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   border-radius: calc(var(--radius) + 6px);
   background: transparent;
   max-width: min(560px, calc(100vw - 1.5rem));
+  max-height: min(92dvh, calc(100% - 1rem - var(--safe-top) - var(--safe-bottom)));
   width: 100%;
+  margin: auto;
   box-shadow: none;
   color: var(--ink);
+  overscroll-behavior: contain;
 }
 
 .settings-dialog[open] {
@@ -376,13 +419,16 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .settings-sheet {
   margin: 0;
-  padding: 1.15rem 1.2rem 1.2rem;
+  padding: 1.15rem 1.2rem calc(1.2rem + var(--safe-bottom));
   border-radius: calc(var(--radius) + 6px);
   background: linear-gradient(180deg, #f7fbfa 0%, #eef4f3 100%);
   border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(16, 36, 40, 0.22);
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 1rem;
+  max-height: inherit;
+  overflow: hidden;
 }
 
 .settings-head {
@@ -406,21 +452,29 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .settings-oklad input {
-  width: 7.4rem;
+  width: 8.2rem;
+  min-height: var(--tap);
   justify-self: end;
   margin: 0;
-  padding: 0.28rem 0.45rem;
-  font-size: 0.95rem;
+  padding: 0.55rem 0.65rem;
+  font-size: var(--field-fs);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-strong);
+  color: var(--ink);
 }
 
 .settings-calc {
   display: grid;
   gap: 0.35rem;
-  max-height: min(52vh, 420px);
+  min-height: 0;
+  max-height: none;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding-right: 0.15rem;
 }
 
@@ -464,8 +518,13 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 .settings-foot {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.55rem;
-  padding-top: 0.15rem;
+  padding-top: 0.35rem;
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(238, 244, 243, 0) 0%, #eef4f3 28%);
+  z-index: 2;
 }
 
 .file-btn {
@@ -505,10 +564,16 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   justify-content: start;
   align-items: center;
   gap: 0.55rem;
+  min-height: var(--tap);
+  cursor: pointer;
 }
 
 .check-field input {
-  width: auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-width: 1.25rem;
+  margin: 0;
+  accent-color: var(--ink);
 }
 
 .partial-box {
@@ -537,8 +602,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   gap: 0.4rem;
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   padding: 0.15rem 0 0.35rem;
   scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.month-nav .month-chip {
+  scroll-snap-align: start;
 }
 
 .sheet-top {
@@ -559,7 +631,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: #fff;
   color: var(--ink);
   border-radius: 999px;
-  padding: 0.55rem 0.9rem;
+  min-height: var(--tap);
+  padding: 0.65rem 1rem;
   font: inherit;
   font-weight: 500;
   font-size: 0.92rem;
@@ -711,14 +784,26 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .field input,
 .data-table input,
+.data-table select,
+.settings-oklad input {
+  scroll-margin-top: calc(var(--tap) + var(--safe-top) + 1.25rem);
+  scroll-margin-bottom: 7rem;
+}
+
+.field input:not([type="checkbox"]):not([type="radio"]),
+.data-table input:not([type="checkbox"]):not([type="radio"]),
 .data-table select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 11px;
-  padding: 0.65rem 0.75rem;
+  min-height: var(--tap);
+  padding: 0.7rem 0.75rem;
   font: inherit;
+  font-size: var(--field-fs);
   color: var(--ink);
   background: var(--surface-strong);
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .field input:focus,
@@ -729,6 +814,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .expense-panel .data-table input.delta-neg {
@@ -934,8 +1021,13 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
+  min-width: var(--tap);
+  min-height: var(--tap);
   padding: 0.2rem 0.35rem;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-x:hover {
@@ -985,6 +1077,20 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   opacity: 1;
 }
 
+@media (hover: none) {
+  .rent-hint {
+    opacity: 0.92;
+    position: static;
+    transform: none;
+    display: inline-block;
+    margin: 0.35rem 0 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 0;
+    white-space: normal;
+  }
+}
+
 .rent-dialog {
   max-width: min(480px, calc(100vw - 1.5rem));
 }
@@ -996,15 +1102,17 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .rent-line {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 6.4rem auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(5.5rem, 6.4rem) auto;
   gap: 0.4rem;
   align-items: center;
 }
 
 .rent-line input[type="checkbox"] {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-width: 1.25rem;
   margin: 0;
+  accent-color: var(--ink);
 }
 
 .rent-line .name-input,
@@ -1012,8 +1120,10 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 11px;
-  padding: 0.5rem 0.65rem;
+  min-height: var(--tap);
+  padding: 0.65rem 0.7rem;
   font: inherit;
+  font-size: var(--field-fs);
   color: var(--ink);
   background: var(--surface-strong);
 }
@@ -1038,7 +1148,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 .site-foot {
   position: relative;
   z-index: 3;
-  padding: clamp(3rem, 8vw, 5rem) var(--pad) 2.4rem;
+  padding: clamp(3rem, 8vw, 5rem) max(var(--pad), var(--safe-right)) calc(2.4rem + var(--safe-bottom)) max(var(--pad), var(--safe-left));
   background: #161412;
   color: var(--cream);
 }
@@ -1068,6 +1178,18 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 @media (max-width: 640px) {
+  .hero {
+    min-height: auto;
+  }
+
+  .hero-copy {
+    padding: calc(5.5rem + var(--safe-top)) 0 2.2rem;
+  }
+
+  .hero-brand {
+    font-size: clamp(2.6rem, 12vw, 3.6rem);
+  }
+
   .work-grid {
     grid-template-columns: 1fr;
   }
@@ -1080,9 +1202,92 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
     flex-direction: column;
   }
 
+  .panel-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .panel-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .partial-box {
+    grid-template-columns: 1fr;
+  }
+
   .data-table {
     min-width: 460px;
   }
+
+  .settings-dialog,
+  .rent-dialog {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    margin-top: auto;
+    border-radius: 18px 18px 0 0;
+    max-height: min(94dvh, calc(100% - var(--safe-top)));
+  }
+
+  .settings-dialog[open],
+  .rent-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .settings-sheet {
+    border-radius: 18px 18px 0 0;
+    padding: 1rem 1rem calc(1rem + var(--safe-bottom));
+  }
+
+  .settings-foot {
+    justify-content: stretch;
+  }
+
+  .settings-foot .btn {
+    flex: 1 1 auto;
+  }
+
+  .calc-row {
+    grid-template-columns: 1fr auto;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .calc-row .calc-rate {
+    grid-column: 1;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .calc-row .calc-amount,
+  .settings-oklad input {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .settings-oklad {
+    align-items: center;
+  }
+
+  .rent-line {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check name remove"
+      "check amount remove";
+  }
+
+  .rent-line input[type="checkbox"] { grid-area: check; }
+  .rent-line .name-input { grid-area: name; }
+  .rent-line .num-input {
+    grid-area: amount;
+    width: 100%;
+    max-width: none;
+  }
+  .rent-line .icon-x { grid-area: remove; }
 }
 
 @media (prefers-reduced-motion: reduce) {

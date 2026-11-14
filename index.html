@@ -2,14 +2,19 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="Бюджет 2026 — месячный план доходов и расходов" />
+  <meta name="theme-color" content="#121614" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
   <title>Бюджет 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=1.8.2" />
+  <link rel="stylesheet" href="styles.css?v=1.8.3" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 </head>
 <body>
   <input type="checkbox" id="navToggle" class="nav-toggle" />
@@ -20,7 +25,7 @@
         <span class="burger-icon"></span>
         <span class="burger-label">Меню</span>
       </label>
-      <p class="app-version" title="Версия программы">1.8.2</p>
+      <p class="app-version" title="Версия программы">1.8.3</p>
     </div>
   </header>
   <nav class="nav" aria-label="Действия">
@@ -97,21 +102,21 @@
       <div class="partial-box" id="partialBox" hidden>
         <label class="field">
           <span>Отработано с 1 по 15</span>
-          <input type="text" inputmode="numeric" id="workFirst" autocomplete="off" />
+          <input type="text" inputmode="numeric" enterkeyhint="done" id="workFirst" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
         <label class="field">
           <span>Отработано с 16 по конец</span>
-          <input type="text" inputmode="numeric" id="workSecond" autocomplete="off" />
+          <input type="text" inputmode="numeric" enterkeyhint="done" id="workSecond" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
       </div>
       <div class="partial-box" id="vacationBox" hidden>
         <label class="field">
           <span>Дней отпуска</span>
-          <input type="text" inputmode="numeric" id="workVacation" autocomplete="off" />
+          <input type="text" inputmode="numeric" enterkeyhint="done" id="workVacation" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
         <label class="field">
           <span>Средний заработок в день</span>
-          <input type="text" inputmode="decimal" id="workDaily" autocomplete="off" />
+          <input type="text" inputmode="decimal" enterkeyhint="done" id="workDaily" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
       </div>
     </section>
@@ -249,7 +254,7 @@
         <label class="calc-row settings-oklad">
           <span class="calc-label">Оклад</span>
           <span class="calc-rate"></span>
-          <input type="text" inputmode="decimal" id="settingsOklad" name="oklad" autocomplete="off" />
+          <input type="text" inputmode="decimal" enterkeyhint="done" id="settingsOklad" name="oklad" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
         <div class="calc-row">
           <span class="calc-label">Районный коэффициент</span>
@@ -285,8 +290,8 @@
     </div>
   </dialog>
 
-  <script src="calendar.js?v=1.8.2"></script>
-  <script src="salary.js?v=1.8.2"></script>
-  <script src="app.js?v=1.8.2"></script>
+  <script src="calendar.js?v=1.8.3"></script>
+  <script src="salary.js?v=1.8.3"></script>
+  <script src="app.js?v=1.8.3"></script>
 </body>
 </html>
