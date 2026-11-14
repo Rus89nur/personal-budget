@@ -1338,7 +1338,9 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   font-weight: 500;
   line-height: 1.3;
   text-align: center;
-  min-height: 1.3em;
+  height: 1.3em;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .rent-row:hover .rent-hint,

@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.13.3";
+  const APP_VERSION = "1.13.4";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2289,7 +2289,7 @@
 
   let analyticsYear = null;
   let analyticsMonth = null;
-  let analyticsYearBars = false;
+  let analyticsYearPoints = false;
 
   function yearMonth(year, index) {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
@@ -2439,46 +2439,41 @@
     return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}${baseline}${ticks}</svg>`;
   }
 
-  function yearBarChart(labels, series, markIndex) {
+  function pointChart(labels, series) {
     const width = 720;
-    const labelW = 48;
-    const padRight = 12;
-    const padTop = 6;
-    const axisH = 22;
-    const rowH = series.length > 1 ? 38 : 28;
-    const height = padTop + labels.length * rowH + axisH;
-    const plotW = width - labelW - padRight;
+    const height = 252;
+    const padLeft = 64;
+    const padRight = 8;
+    const padTop = 16;
+    const padBottom = 28;
+    const plotW = width - padLeft - padRight;
+    const plotH = height - padTop - padBottom;
     const rawMax = Math.max(0, ...series.flatMap((item) => item.values.map((n) => Number(n) || 0)));
     const axis = chartAxis(rawMax);
-    const barGap = 3;
-    const barH = Math.min(11, (rowH - 12) / series.length);
-    const rows = labels.map((label, index) => {
-      const y = padTop + index * rowH;
-      const band = index === markIndex
-        ? `<rect x="${labelW - 6}" y="${(y + 1).toFixed(1)}" width="${plotW + 10}" height="${rowH - 2}" rx="8" fill="rgba(28,27,25,0.05)" />`
-        : "";
-      const bars = series.map((item, seriesIndex) => {
-        const value = Number(item.values[index]) || 0;
-        const barW = (plotW * value) / axis.top;
-        const offset = (rowH - series.length * barH - (series.length - 1) * barGap) / 2;
-        const barY = y + offset + seriesIndex * (barH + barGap);
-        return `<rect x="${labelW}" y="${barY.toFixed(1)}" width="${(value > 0 ? Math.max(barW, 1.5) : 0).toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${item.color}" />`;
-      }).join("");
-      const tip = chartTipPayload(label, series.map((item) => ({
-        name: item.name,
-        value: Number(item.values[index]) || 0,
-        color: item.color,
-      })));
-      return `${band}<text x="0" y="${(y + rowH / 2 + 4).toFixed(1)}" fill="#3f3c37" font-size="12">${escapeAttr(label)}</text>${bars}<rect class="chart-hit" x="0" y="${y}" width="${width}" height="${rowH}" fill="transparent" data-chart-tip="${tip}" />`;
+    const groupW = plotW / labels.length;
+    const yOf = (value) => padTop + plotH - (value / axis.top) * plotH;
+    const xOf = (index) => padLeft + index * groupW + groupW / 2;
+    const grid = axis.ticks.map((tick) => {
+      const y = yOf(tick);
+      return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="rgba(28,27,25,0.14)" />
+        <text x="${padLeft - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#6d6962" font-size="11">${escapeAttr(axisMoney(tick))}</text>`;
     }).join("");
-    const ticks = axis.ticks.map((tick) => {
-      const x = labelW + (plotW * tick) / axis.top;
-      const anchor = tick === 0 ? "start" : tick === axis.top ? "end" : "middle";
-      return `<line x1="${x.toFixed(1)}" y1="${height - axisH}" x2="${x.toFixed(1)}" y2="${height - axisH + 4}" stroke="rgba(28,27,25,0.28)" />
-        <text x="${x.toFixed(1)}" y="${height - 4}" text-anchor="${anchor}" fill="#6d6962" font-size="11">${escapeAttr(axisMoney(tick))}</text>`;
+    const lines = series.map((item) => {
+      const points = labels.map((_, index) => `${xOf(index).toFixed(1)},${yOf(Number(item.values[index]) || 0).toFixed(1)}`).join(" ");
+      return `<polyline points="${points}" fill="none" stroke="${item.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
     }).join("");
-    const baseline = `<line x1="${labelW}" y1="${height - axisH}" x2="${labelW + plotW}" y2="${height - axisH}" stroke="rgba(28,27,25,0.18)" />`;
-    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Линейчатый график">${rows}${baseline}${ticks}</svg>`;
+    const dots = series.map((item) => labels.map((_, index) => {
+      const y = yOf(Number(item.values[index]) || 0);
+      return `<circle cx="${xOf(index).toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${item.color}" stroke="#f7f4ee" stroke-width="2" />`;
+    }).join("")).join("");
+    const hits = [];
+    const captions = [];
+    labels.forEach((label, index) => {
+      const x0 = padLeft + index * groupW;
+      hits.push(`<rect class="chart-hit" x="${x0.toFixed(1)}" y="${padTop}" width="${groupW.toFixed(1)}" height="${plotH}" fill="transparent" data-chart-tip="${chartTipPayload(label, series.map((item) => ({ name: item.name, value: Number(item.values[index]) || 0, color: item.color })))}" />`);
+      captions.push(`<text x="${xOf(index).toFixed(1)}" y="${height - 8}" text-anchor="middle" fill="#6d6962" font-size="11">${escapeAttr(label)}</text>`);
+    });
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="График с точками по месяцам">${grid}${lines}${dots}${captions.join("")}${hits.join("")}</svg>`;
   }
 
   function paintChartTip(data) {
@@ -2560,14 +2555,15 @@
     MONTHS_SHORT.forEach((name, index) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `month-chip${index === analyticsMonth ? " active" : ""}`;
+      const pressed = !analyticsYearPoints && index === analyticsMonth;
+      btn.className = `month-chip${pressed ? " active" : ""}`;
       btn.textContent = name;
-      btn.setAttribute("aria-pressed", index === analyticsMonth ? "true" : "false");
+      btn.setAttribute("aria-pressed", pressed ? "true" : "false");
       btn.addEventListener("click", () => {
-        if (analyticsMonth === index) analyticsYearBars = !analyticsYearBars;
+        if (!analyticsYearPoints && analyticsMonth === index) analyticsYearPoints = true;
         else {
           analyticsMonth = index;
-          analyticsYearBars = false;
+          analyticsYearPoints = false;
         }
         renderAnalytics();
       });
@@ -2591,11 +2587,13 @@
     const savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
     const utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
     const monthName = MONTHS_RU[selectedMonth] || "";
-    const parts = monthParts(year, selectedMonth);
-    const drawYear = analyticsYearBars ? yearBarChart : columnChart;
-    const viewNote = analyticsYearBars
-      ? "Линейчатый график за год. Ещё раз по выбранному месяцу — столбцы."
-      : "Ещё раз по выбранному месяцу — линейчатый график за год.";
+    const parts = analyticsYearPoints ? null : monthParts(year, selectedMonth);
+    const viewNote = analyticsYearPoints
+      ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
+      : "Ещё раз по выбранному месяцу — график с точками за год.";
+    const yearChart = (series) => analyticsYearPoints
+      ? pointChart(MONTHS_SHORT, series)
+      : columnChart(MONTHS_SHORT, series, selectedMonth);
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2612,20 +2610,20 @@
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
         <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}. ${viewNote}</p>
-        ${drawYear(MONTHS_SHORT, flow, selectedMonth)}
+        ${yearChart(flow)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(saved)))}</p>
-        ${drawYear(MONTHS_SHORT, savedSeries, selectedMonth)}
+        ${yearChart(savedSeries)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(utilities)))}</p>
-        ${drawYear(MONTHS_SHORT, utilitySeries, selectedMonth)}
+        ${yearChart(utilitySeries)}
         ${chartLegend(utilitySeries)}
       </article>
     `;
