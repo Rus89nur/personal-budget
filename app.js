@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.10.2";
+  const APP_VERSION = "1.11.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -82,6 +82,7 @@
     brokerIncomeHead: document.getElementById("brokerIncomeHead"),
     brokerIncomeBody: document.getElementById("brokerIncomeBody"),
     btnAddBrokerIncome: document.getElementById("btnAddBrokerIncome"),
+    btnAddSavings: document.getElementById("btnAddSavings"),
     utilitiesHead: document.getElementById("utilitiesHead"),
     utilitiesBody: document.getElementById("utilitiesBody"),
     analyticsYear: document.getElementById("analyticsYear"),
@@ -1747,7 +1748,15 @@
     { id: "topup", name: "Пополнил БС", calc: "topup" },
   ];
 
-  const SAVINGS_EARNED = ["deposit", "broker", "iis", "iis3", "flat1", "flat2", "garage"];
+  const SAVINGS_ASIDE = new Set(["own", "capitalPlan", "capitalFact"]);
+
+  function savingsLineTemplate() {
+    return SAVINGS_ROWS.map((row) => ({
+      id: row.id,
+      name: row.name,
+      ...(row.calc ? { calc: row.calc } : {}),
+    }));
+  }
 
   function defaultBrokerIncomes() {
     const line = (id, name, amounts) => ({ id, name, amounts });
@@ -1766,6 +1775,7 @@
 
   function defaultSavingsFact() {
     return {
+      lines: savingsLineTemplate(),
       rows: {
         deposit: { "2026-01": 30640, "2026-02": 20963, "2026-03": 32708, "2026-04": 24695 },
         broker: { "2025-08": 18000, "2025-11": 8368, "2025-12": 14606, "2026-01": 5461, "2026-02": 4169, "2026-03": 6377.04, "2026-05": 32205.73, "2026-06": 36835.8, "2026-07": 37503, "2026-08": 42123, "2026-09": 39944.3, "2026-10": 56306.7 },
@@ -1792,7 +1802,15 @@
       target.savingsFact.brokerIncomes = defaultBrokerIncomes();
       changed = true;
     }
+    if (!Array.isArray(target.savingsFact.lines) || !target.savingsFact.lines.length) {
+      target.savingsFact.lines = savingsLineTemplate();
+      changed = true;
+    }
     return changed;
+  }
+
+  function savingsLines() {
+    return state.savingsFact.lines;
   }
 
   function savingsStored(id, key) {
@@ -1820,8 +1838,17 @@
   }
 
   function savingsEarned(key) {
-    const parts = SAVINGS_EARNED.map((id) => (id === "broker" ? brokerIncomeSum(key) : savingsStored(id, key)))
-      .filter((value) => value != null);
+    const parts = [];
+    savingsLines().forEach((row) => {
+      if (row.id === "broker") {
+        const broker = brokerIncomeSum(key);
+        if (broker != null) parts.push(broker);
+        return;
+      }
+      if (row.calc || SAVINGS_ASIDE.has(row.id)) return;
+      const value = savingsStored(row.id, key);
+      if (value != null) parts.push(value);
+    });
     if (!parts.length) return null;
     return savingsRound(parts.reduce((sum, value) => sum + value, 0));
   }
@@ -1904,17 +1931,29 @@
       <tr>
         <th><span class="col-title">Строка</span></th>
         ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
+        <th class="actions-col"></th>
       </tr>
     `;
     els.savingsBody.innerHTML = "";
-    SAVINGS_ROWS.forEach((row) => {
+    savingsLines().forEach((row) => {
       const tr = document.createElement("tr");
       if (row.calc) tr.classList.add("is-total");
+      const name = row.calc
+        ? nameCell(row.name)
+        : `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
+      const action = row.calc
+        ? ""
+        : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`;
       tr.innerHTML = `
-        <td>${nameCell(row.name)}</td>
+        <td>${name}</td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
+        <td class="actions-col">${action}</td>
       `;
-      tr.querySelectorAll("input:not([readonly])").forEach((input) => {
+      tr.querySelector("[data-field='name']")?.addEventListener("change", (event) => {
+        row.name = event.target.value.trim() || "Строка";
+        saveState();
+      });
+      tr.querySelectorAll("input[data-month]").forEach((input) => {
         input.addEventListener("change", () => {
           const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
@@ -1924,6 +1963,12 @@
           saveState();
           renderSavings();
         });
+      });
+      tr.querySelector("[data-act='del']")?.addEventListener("click", () => {
+        state.savingsFact.lines = savingsLines().filter((item) => item.id !== row.id);
+        delete state.savingsFact.rows[row.id];
+        saveState();
+        renderSavings();
       });
       els.savingsBody.appendChild(tr);
     });
@@ -2428,6 +2473,17 @@
   });
 
   els.btnFillExpenses.addEventListener("click", () => fillExpensesFromPrevious());
+
+  els.btnAddSavings?.addEventListener("click", () => {
+    const lines = savingsLines();
+    const index = lines.findIndex((row) => row.id === "earned");
+    const line = { id: uid("sav"), name: "Новая строка" };
+    if (index < 0) lines.push(line);
+    else lines.splice(index, 0, line);
+    state.savingsFact.rows[line.id] = {};
+    saveState();
+    renderSavings();
+  });
 
   els.btnAddBrokerIncome.addEventListener("click", () => {
     if (!state.savingsFact.brokerIncomes) state.savingsFact.brokerIncomes = [];
