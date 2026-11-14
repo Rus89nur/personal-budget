@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.0";
+  const APP_VERSION = "1.4.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -97,7 +97,6 @@
       income: [
         { id: uid("inc"), label: "ЗП", amount: 0 },
         { id: uid("inc"), label: "Аванс", amount: 0 },
-        { id: uid("inc"), label: "КВ", amount: 0 },
         {
           id: uid("inc"),
           kind: "rent",
@@ -308,6 +307,7 @@
     };
     attachYear(next, year);
     ensureRentStructure(next);
+    dropKvFromDecember(next);
     return next;
   }
 
@@ -365,6 +365,38 @@
 
   function isPayrollLabel(label) {
     return isSalaryLabel(label) || isAdvanceLabel(label) || isVacationLabel(label);
+  }
+
+  function isKvLabel(label) {
+    return /^кв$/i.test(String(label || "").trim());
+  }
+
+  function dropKvFromDecember(target) {
+    const start = monthSerial("2026-12");
+    let changed = false;
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key) => {
+        if (monthSerial(key) < start) return;
+        const month = target.years?.[year]?.months?.[key];
+        if (!month) return;
+        const next = (month.income || []).filter((row) => !isKvLabel(row.label));
+        if (next.length !== (month.income || []).length) {
+          month.income = next;
+          changed = true;
+        }
+        (month.expenses || []).forEach((row) => {
+          if (row.shares && Object.prototype.hasOwnProperty.call(row.shares, "name:кв")) {
+            delete row.shares["name:кв"];
+            changed = true;
+          }
+          if (row.sharesManual && Object.prototype.hasOwnProperty.call(row.sharesManual, "name:кв")) {
+            delete row.sharesManual["name:кв"];
+            changed = true;
+          }
+        });
+      });
+    });
+    return changed;
   }
 
   function freshRentLines() {
@@ -1293,6 +1325,7 @@
           }
         }
         ensureRentStructure(next);
+        dropKvFromDecember(next);
         if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
         state = next;
         saveState();
@@ -1412,7 +1445,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state)) saveState();
     render();
   }
 
