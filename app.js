@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.20.3";
+  const APP_VERSION = "1.21.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2475,6 +2475,18 @@
     return state.years?.[year]?.months?.[key] || null;
   }
 
+  function payrollAmount(month) {
+    if (!month?.income) return 0;
+    return month.income.reduce((sum, row) => {
+      if (!isSalaryLabel(row.label) && !isAdvanceLabel(row.label)) return sum;
+      return sum + (Number(row.amount) || 0);
+    }, 0);
+  }
+
+  function payrollSeries(year) {
+    return Array.from({ length: 12 }, (_, index) => payrollAmount(yearMonth(year, index)));
+  }
+
   function budgetSeries(year) {
     const income = [];
     const plan = [];
@@ -2763,6 +2775,7 @@
     const packs = years.map((item) => ({
       year: item,
       budget: budgetSeries(item),
+      payroll: payrollSeries(item),
       saved: monthAmounts(item, (key) => savingsTopup(key)),
       utilities: monthAmounts(item, (key) => utilityTotal(key)),
     }));
@@ -2775,6 +2788,7 @@
       { name: "Доходы", color: "#1d6b45", values: pack.budget.income },
       { name: "Расходы", color: "#8d3a32", values: pack.budget.plan },
     ];
+    const payrollOf = (pack) => [{ name: "Зарплата", color: "#1d6b45", values: pack.payroll }];
     const savedOf = (pack) => [{ name: "Отложено", color: "#9a6424", values: pack.saved }];
     const utilityOf = (pack) => [{ name: "Коммуналка", color: "#1f4d4a", values: pack.utilities }];
     const compare = years.length > 1 && marks.length === 0;
@@ -2785,6 +2799,11 @@
         { name: `Расходы ${pack.year}`, color: tone.expense, values: pack.budget.plan },
       ];
     });
+    const comparePayroll = packs.map((pack, index) => ({
+      name: `Зарплата ${pack.year}`,
+      color: yearTone(index).income,
+      values: pack.payroll,
+    }));
     const compareSaved = packs.map((pack, index) => ({
       name: `Отложено ${pack.year}`,
       color: yearTone(index).saved,
@@ -2797,6 +2816,7 @@
     }));
     const incomeSum = sumNumbers(packs.flatMap((pack) => pack.budget.income));
     const planSum = sumNumbers(packs.flatMap((pack) => pack.budget.plan));
+    const payrollSum = sumNumbers(packs.flatMap((pack) => pack.payroll));
     const savedSum = sumNumbers(packs.flatMap((pack) => pack.saved));
     const utilitySum = sumNumbers(packs.flatMap((pack) => pack.utilities));
     const monthName = MONTHS_RU[selectedMonth] || "";
@@ -2820,6 +2840,7 @@
       }).join("");
     };
     const flow = compare ? compareFlow : flowOf(packs[0]);
+    const payrollSeriesView = compare ? comparePayroll : payrollOf(packs[0]);
     const savedSeries = compare ? compareSaved : savedOf(packs[0]);
     const utilitySeries = compare ? compareUtility : utilityOf(packs[0]);
     const paint = (series, seriesOf) => (
@@ -2844,6 +2865,12 @@
         ${paint(flow, flowOf)}
         ${chartLegend(flow)}
         ${breakdown}
+      </article>
+      <article class="chart-card">
+        <h4>Зарплата</h4>
+        <p class="chart-note">${periodNote}: ${escapeAttr(money(payrollSum))}. Зарплата и аванс месяца вместе.</p>
+        ${paint(payrollSeriesView, payrollOf)}
+        ${chartLegend(payrollSeriesView)}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
