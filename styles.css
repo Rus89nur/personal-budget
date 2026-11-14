@@ -803,33 +803,35 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   color: var(--muted);
 }
 
-.expense-panel tbody td {
+.expense-panel tbody td,
+.expense-panel .data-table tbody tr:hover td {
   background: transparent;
-  transition: background 0.16s ease;
-}
-
-.expense-panel tbody tr:hover td {
-  background: rgba(28, 27, 25, 0.06);
-}
-
-.expense-panel tbody tr:hover td:first-child {
-  border-radius: 14px 0 0 14px;
-}
-
-.expense-panel tbody tr:hover td:last-child {
-  border-radius: 0 14px 14px 0;
 }
 
 .expense-panel .data-table input {
   border: none;
   background: transparent;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: none;
   padding: 0.45rem 0.4rem;
+  transition: background 0.16s ease;
 }
 
-.expense-panel .data-table input:focus {
+.expense-panel .data-table tbody input:hover,
+.expense-panel .data-table tbody input:focus {
+  background: rgba(28, 27, 25, 0.06);
   outline: none;
+}
+
+.expense-panel .remain-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.expense-panel .remain-value {
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .expense-panel .data-table input.is-inherited {

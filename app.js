@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.3.7";
+  const APP_VERSION = "1.3.8";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -812,6 +812,20 @@
         <th class="actions-col"></th>
       </tr>
     `;
+    let foot = document.getElementById("expenseFoot");
+    if (!foot) {
+      foot = document.createElement("tfoot");
+      foot.id = "expenseFoot";
+      els.expenseHead.parentElement.appendChild(foot);
+    }
+    foot.innerHTML = `
+      <tr>
+        <th class="remain-label">Остаток</th>
+        <th class="num remain-value" data-remain="plan"></th>
+        ${columns.map((col) => `<th class="num remain-value" data-remain-id="${escapeAttr(col.id)}"></th>`).join("")}
+        <th></th>
+      </tr>
+    `;
     els.expenseBody.innerHTML = "";
     month.expenses.forEach((row, index) => {
       normalizeExpense(row);
@@ -871,10 +885,20 @@
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
     paintText(document.querySelector('#expenseHead [data-sum="plan"]'), money(t.income));
+    paintRemain(document.querySelector('#expenseFoot [data-remain="plan"]'), t.income - t.plan);
     month.income.forEach((row) => {
-      const node = document.querySelector(`#expenseHead [data-income-id="${CSS.escape(row.id)}"]`);
-      if (node) paintText(node, money(Number(row.amount) || 0));
+      const head = document.querySelector(`#expenseHead [data-income-id="${CSS.escape(row.id)}"]`);
+      const amount = Number(row.amount) || 0;
+      if (head) paintText(head, money(amount));
+      const left = document.querySelector(`#expenseFoot [data-remain-id="${CSS.escape(row.id)}"]`);
+      paintRemain(left, amount - columnSum(month, incomeColumnKey(row)));
     });
+  }
+
+  function paintRemain(node, value) {
+    if (!node) return;
+    paintText(node, money(value));
+    node.classList.toggle("delta-neg", value < 0);
   }
 
   function render() {
