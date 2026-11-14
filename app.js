@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.17.1";
+  const APP_VERSION = "1.18.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1924,12 +1924,10 @@
     { id: "flat1", name: "Квартира 1" },
     { id: "flat2", name: "Квартира 2" },
     { id: "garage", name: "Гараж" },
-    { id: "own", name: "Вложил свои" },
-    { id: "earned", name: "Заработал в месяц", calc: "earned" },
-    { id: "capitalPlan", name: "Капитал план" },
-    { id: "capitalFact", name: "Капитал факт" },
-    { id: "delta", name: "Прирост", calc: "delta" },
+    { id: "own", name: "Вложил свои", calc: "own" },
+    { id: "earned", name: "Заработал в месяц (пасив)", calc: "earned" },
     { id: "topup", name: "Пополнил БС", calc: "topup" },
+    { id: "delta", name: "Прирост", calc: "delta" },
   ];
 
   const SAVINGS_ASIDE = new Set(["own", "capitalPlan", "capitalFact"]);
@@ -1967,9 +1965,7 @@
         flat1: { "2026-01": 19000, "2026-02": 19500, "2026-03": 19500, "2026-04": 19500, "2026-05": 21338, "2026-06": 20748, "2026-07": 20100, "2026-08": 20414, "2026-09": 20484, "2026-10": 21667 },
         flat2: { "2026-01": 25000, "2026-02": 25000, "2026-03": 25000, "2026-04": 25000, "2026-05": 28451, "2026-06": 28500, "2026-07": 30000, "2026-08": 26595, "2026-09": 3651, "2026-10": 0 },
         garage: { "2026-01": 16500, "2026-02": 16500, "2026-03": 16500, "2026-04": 6500, "2026-05": 16500, "2026-06": 16500, "2026-07": 16500, "2026-08": 16500, "2026-09": 16500, "2026-10": 16500 },
-        own: { "2026-01": 60000, "2026-02": 145870, "2026-03": 0, "2026-04": 118000, "2026-05": 118000, "2026-06": 108000, "2026-07": 0, "2026-08": 200000, "2026-09": 90000, "2026-10": 120000, "2026-11": 36468, "2026-12": 60000 },
-        capitalPlan: { "2026-01": 3109070, "2026-02": 3341072, "2026-04": 3694388, "2026-05": 3910882.73, "2026-06": 3518867.8, "2026-07": 3622970.8, "2026-08": 3928602.8, "2026-09": 4099182.1, "2026-10": 4313655.8, "2026-11": 4350123.8, "2026-12": 4410123.8 },
-        capitalFact: { "2026-03": 3525388, "2026-05": 3308284 },
+        own: {},
       },
       brokerIncomes: defaultBrokerIncomes(),
     };
@@ -1989,7 +1985,30 @@
       target.savingsFact.lines = savingsLineTemplate();
       changed = true;
     }
+    const arranged = arrangeSavingsLines(target.savingsFact.lines);
+    if (JSON.stringify(arranged) !== JSON.stringify(target.savingsFact.lines)) {
+      target.savingsFact.lines = arranged;
+      changed = true;
+    }
     return changed;
+  }
+
+  function arrangeSavingsLines(lines) {
+    const hidden = new Set(["capitalPlan", "capitalFact"]);
+    const tailIds = ["earned", "topup", "delta"];
+    const byId = Object.fromEntries(lines.map((row) => [row.id, row]));
+    const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id));
+    const own = rest.find((row) => row.id === "own");
+    if (own) own.calc = "own";
+    const earned = byId.earned || { id: "earned", name: "Заработал в месяц (пасив)", calc: "earned" };
+    earned.name = "Заработал в месяц (пасив)";
+    earned.calc = "earned";
+    const topup = byId.topup || { id: "topup", name: "Пополнил БС", calc: "topup" };
+    topup.name = topup.name || "Пополнил БС";
+    topup.calc = "topup";
+    const delta = byId.delta || { id: "delta", name: "Прирост", calc: "delta" };
+    delta.calc = "delta";
+    return [...rest, earned, topup, delta];
   }
 
   function savingsLines() {
@@ -2036,9 +2055,32 @@
     return savingsRound(parts.reduce((sum, value) => sum + value, 0));
   }
 
+  function setAsideForMonth(key) {
+    const month = state.years?.[yearOf(key)]?.months?.[key];
+    if (!month?.expenses) return null;
+    let sum = 0;
+    let found = false;
+    month.expenses.forEach((row) => {
+      if (!isSetAsideRow(row)) return;
+      const plan = cellValue(row, "plan");
+      if (plan != null) {
+        sum += plan;
+        found = true;
+        return;
+      }
+      Object.keys(row.shares || {}).forEach((col) => {
+        const value = cellValue(row, col);
+        if (value == null) return;
+        sum += value;
+        found = true;
+      });
+    });
+    return found ? savingsRound(sum) : null;
+  }
+
   function savingsTopup(key) {
     const earned = savingsEarned(key);
-    const own = savingsStored("own", key);
+    const own = setAsideForMonth(key);
     if (earned == null && own == null) return null;
     return savingsRound((earned || 0) + (own || 0));
   }
@@ -2052,6 +2094,7 @@
 
   function savingsCalc(kind, key) {
     if (kind === "earned") return savingsEarned(key);
+    if (kind === "own") return setAsideForMonth(key);
     if (kind === "broker") return brokerIncomeSum(key);
     if (kind === "topup") return savingsTopup(key);
     return savingsDelta(key);
@@ -2120,7 +2163,8 @@
     els.savingsBody.innerHTML = "";
     savingsLines().forEach((row) => {
       const tr = document.createElement("tr");
-      if (row.calc) tr.classList.add("is-total");
+      if (row.id === "earned" || row.id === "topup") tr.classList.add("is-savings-hot");
+      else if (row.calc) tr.classList.add("is-total");
       const name = row.calc
         ? nameCell(row.name)
         : `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
