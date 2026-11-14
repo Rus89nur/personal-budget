@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.8";
+  const APP_VERSION = "1.4.9";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -214,8 +214,9 @@
   function cellValue(row, key) {
     if (!cellManual(row, key)) return null;
     const value = key === "plan" ? row.plan : row.shares?.[key];
-    if (value == null || value === "") return null;
-    return Number(value) || 0;
+    if (value == null || value === "" || Number(value) === 0) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
   }
 
   function previousExpenseMonth() {
@@ -412,6 +413,30 @@
             delete row.sharesManual["name:кв"];
             changed = true;
           }
+        });
+      });
+    });
+    return changed;
+  }
+
+  function blankExpenseZeros(target) {
+    let changed = false;
+    YEARS.forEach((year) => {
+      Object.values(target.years?.[year]?.months || {}).forEach((month) => {
+        (month.expenses || []).forEach((row) => {
+          normalizeExpense(row);
+          if (row.plan === 0) {
+            row.plan = null;
+            row.planManual = false;
+            changed = true;
+          }
+          Object.keys(row.shares || {}).forEach((key) => {
+            if (Number(row.shares[key]) === 0) {
+              delete row.shares[key];
+              delete row.sharesManual[key];
+              changed = true;
+            }
+          });
         });
       });
     });
@@ -1242,8 +1267,9 @@
         let arming = false;
 
         const commitCell = (parsed) => {
-          writeExpenseCell(row, key, parsed);
-          input.value = parsed == null ? "" : formatEditable(parsed);
+          const stored = parsed == null || parsed === 0 ? null : parsed;
+          writeExpenseCell(row, key, stored);
+          input.value = stored == null ? "" : formatEditable(stored);
           input.classList.remove("is-suggestion");
           delete input.dataset.pending;
           state.seeded = false;
@@ -1295,11 +1321,12 @@
             return;
           }
           const parsed = parseNumber(input.value);
-          if (parsed === cellValue(row, key)) {
-            input.value = parsed == null ? "" : formatEditable(parsed);
+          const stored = parsed == null || parsed === 0 ? null : parsed;
+          if (stored === cellValue(row, key)) {
+            input.value = stored == null ? "" : formatEditable(stored);
             return;
           }
-          commitCell(parsed);
+          commitCell(stored);
         });
       });
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
@@ -1551,7 +1578,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state)) saveState();
     render();
   }
 
