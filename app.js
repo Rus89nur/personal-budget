@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.2.1";
+  const APP_VERSION = "1.2.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -794,7 +794,7 @@
     renderExpenses(month);
     refreshTotalsOnly();
     if (switched) {
-      [".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
+      [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
         markFresh(selector, index);
       });
       document.querySelector(".month-chip.active")?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
