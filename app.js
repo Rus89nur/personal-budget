@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.2.2";
+  const APP_VERSION = "1.2.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -384,8 +384,12 @@
         const advanceRow = ensureIncomeRow(month, "advance", `Аванс ${MONTH_GENITIVE[index]}`);
         writeAmount(advanceRow, own.advance, force);
 
-        const vacationRow = ensureIncomeRow(month, "vacation", "Отпускные");
-        writeAmount(vacationRow, own.vacation, force);
+        if (month.workdays.vacationOn) {
+          const vacationRow = ensureIncomeRow(month, "vacation", "Отпускные");
+          writeAmount(vacationRow, own.vacation, force);
+        } else {
+          month.income = month.income.filter((row) => !isVacationLabel(row.label));
+        }
         dedupePayrollRows(month);
       });
     });
