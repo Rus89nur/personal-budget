@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Личный бюджет — простой учёт доходов и расходов" />
+  <title>Личный бюджет</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a5c4a'/%3E%3Cpath d='M16 40h32M20 40V24h8c6 0 6 8 0 8h-8M36 40V28h6c4 0 4 6 0 6h-6' stroke='%23e8f5f0' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="hero">
+    <p class="hero-kicker">Rus89nur</p>
+    <h1 class="hero-brand">Личный бюджет</h1>
+    <p class="hero-lead">Доходы, расходы и баланс по месяцам — просто и наглядно.</p>
+    <div class="hero-actions">
+      <button type="button" class="btn btn-primary" id="btnAdd">Добавить операцию</button>
+      <button type="button" class="btn btn-ghost" id="btnExport" title="Скачать резервную копию">Экспорт</button>
+      <label class="btn btn-ghost file-btn" title="Загрузить резервную копию">
+        Импорт
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
+      </label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="period-bar" aria-label="Период">
+      <label class="field-inline">
+        <span>Период</span>
+        <select id="periodSelect"></select>
+      </label>
+      <label class="field-inline">
+        <span>Тип</span>
+        <select id="typeFilter">
+          <option value="all">Все</option>
+          <option value="income">Доходы</option>
+          <option value="expense">Расходы</option>
+        </select>
+      </label>
+      <label class="field-inline grow">
+        <span>Категория</span>
+        <select id="categoryFilter">
+          <option value="all">Все категории</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="totals" aria-live="polite">
+      <div class="total-block">
+        <span class="total-label">Баланс периода</span>
+        <strong class="total-value" id="balanceValue">0 ₽</strong>
+      </div>
+      <div class="total-block income">
+        <span class="total-label">Доходы</span>
+        <strong class="total-value" id="incomeValue">0 ₽</strong>
+      </div>
+      <div class="total-block expense">
+        <span class="total-label">Расходы</span>
+        <strong class="total-value" id="expenseValue">0 ₽</strong>
+      </div>
+      <div class="total-block muted">
+        <span class="total-label">Накопительный остаток</span>
+        <strong class="total-value" id="runningValue">0 ₽</strong>
+      </div>
+    </section>
+
+    <section class="list-section">
+      <div class="list-head">
+        <h2>Операции</h2>
+        <p class="list-hint" id="listHint">Данные хранятся только в этом браузере</p>
+      </div>
+      <ul class="tx-list" id="txList"></ul>
+      <p class="empty" id="emptyState" hidden>Пока нет операций за выбранный период. Нажмите «Добавить операцию».</p>
+    </section>
+  </main>
+
+  <dialog class="sheet" id="txDialog">
+    <form id="txForm" class="sheet-form" action="#" novalidate>
+      <header class="sheet-head">
+        <h2 id="dialogTitle">Новая операция</h2>
+        <button type="button" class="icon-btn" id="btnCloseDialog" aria-label="Закрыть">×</button>
+      </header>
+
+      <div class="type-toggle" role="group" aria-label="Тип операции">
+        <label class="toggle-opt">
+          <input type="radio" name="type" value="income" />
+          <span>Доход</span>
+        </label>
+        <label class="toggle-opt">
+          <input type="radio" name="type" value="expense" checked />
+          <span>Расход</span>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Сумма, ₽</span>
+        <input
+          type="text"
+          name="amount"
+          id="amountInput"
+          inputmode="decimal"
+          autocomplete="off"
+          required
+          placeholder="Например, 1000"
+        />
+      </label>
+
+      <label class="field">
+        <span>Категория</span>
+        <select name="category" id="categoryInput" required></select>
+      </label>
+
+      <label class="field">
+        <span>Дата</span>
+        <input type="date" name="date" id="dateInput" required />
+      </label>
+
+      <label class="field">
+        <span>Комментарий</span>
+        <input type="text" name="note" id="noteInput" maxlength="120" placeholder="Необязательно" autocomplete="off" />
+      </label>
+
+      <p class="form-error" id="formError" hidden></p>
+
+      <footer class="sheet-actions">
+        <button type="button" class="btn btn-danger" id="btnDelete" hidden>Удалить</button>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn-ghost" id="btnCancel">Отмена</button>
+        <button type="submit" class="btn btn-primary" id="btnSave">Сохранить</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <footer class="site-foot">
+    <p>Личный бюджет · данные в localStorage этого устройства</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
