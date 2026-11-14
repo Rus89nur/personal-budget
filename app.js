@@ -349,28 +349,7 @@
     const calc = Salary.calculateFromOklad(oklad);
     const rows = [];
 
-    calc.lines.forEach((line) => {
-      if (line.key === "oklad") return;
-      rows.push(`
-        <div class="calc-row">
-          <span class="calc-label">${escapeAttr(line.label)}</span>
-          <span class="calc-rate">${formatRate(line.rate)}</span>
-          <span class="calc-amount">${money(line.amount)}</span>
-        </div>
-      `);
-    });
-
     rows.push(`
-      <div class="calc-row total">
-        <span class="calc-label">Общий облагаемый доход</span>
-        <span class="calc-rate"></span>
-        <span class="calc-amount">${money(calc.grossTaxable)}</span>
-      </div>
-      <div class="calc-row total">
-        <span class="calc-label">После вычета налога (13%)</span>
-        <span class="calc-rate"></span>
-        <span class="calc-amount">${money(calc.net)}</span>
-      </div>
       <div class="calc-row highlight">
         <span class="calc-label">Аванс</span>
         <span class="calc-rate">${calc.advancePct}%</span>
@@ -381,7 +360,28 @@
         <span class="calc-rate">${calc.salaryPct}%</span>
         <span class="calc-amount">${money(calc.salary)}</span>
       </div>
+      <div class="calc-row total">
+        <span class="calc-label">После вычета налога (13%)</span>
+        <span class="calc-rate"></span>
+        <span class="calc-amount">${money(calc.net)}</span>
+      </div>
+      <div class="calc-row total">
+        <span class="calc-label">Общий облагаемый доход</span>
+        <span class="calc-rate"></span>
+        <span class="calc-amount">${money(calc.grossTaxable)}</span>
+      </div>
     `);
+
+    calc.lines.forEach((line) => {
+      if (line.key === "oklad") return;
+      rows.push(`
+        <div class="calc-row">
+          <span class="calc-label">${escapeAttr(line.label)}</span>
+          <span class="calc-rate">${formatRate(line.rate)}</span>
+          <span class="calc-amount">${money(line.amount)}</span>
+        </div>
+      `);
+    });
 
     els.settingsCalc.innerHTML = rows.join("");
   }
