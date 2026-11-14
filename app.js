@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.5";
+  const APP_VERSION = "1.4.7";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1121,9 +1121,13 @@
         tr.style.animationDelay = `${Math.min(index, 8) * 0.045}s`;
       }
       if (rent) {
+        tr.classList.add("rent-row");
         tr.innerHTML = `
-          <td><input class="name-input" type="text" value="Аренда" data-act="rent" readonly /></td>
-          <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="Состав аренды" /></td>
+          <td>
+            <input class="name-input" type="text" value="Аренда" data-act="rent" readonly title="Нажмите, чтобы изменить" />
+            <span class="rent-hint">Нажмите, чтобы изменить</span>
+          </td>
+          <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="Нажмите, чтобы изменить" /></td>
           <td class="actions-col"></td>
         `;
         tr.querySelector("[data-act=rent]").addEventListener("click", openRentMenu);
@@ -1263,6 +1267,15 @@
           if (document.activeElement !== input || input.dataset.pending !== "1") return;
           event.preventDefault();
           commitCell(parseNumber(input.value));
+        });
+
+        input.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          delete input.dataset.pending;
+          input.classList.remove("is-suggestion");
+          commitCell(parseNumber(input.value));
+          input.blur();
         });
 
         input.addEventListener("input", () => {
