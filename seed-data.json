@@ -1,0 +1,1244 @@
+{
+  "version": 2,
+  "year": 2026,
+  "source": "Бюджет_2026",
+  "defaultCategories": [
+    "Отложить",
+    "Жили были",
+    "Ипотека",
+    "Инет, связи",
+    "Комуналка",
+    "Покупки",
+    "Отдых",
+    "Бензин",
+    "Баня",
+    "Дети",
+    "Непланируемые",
+    "Страховки",
+    "Прочее"
+  ],
+  "incomeTemplates": [
+    "ЗП",
+    "Аванс",
+    "КВ",
+    "Брокер",
+    "Пассив",
+    "Отпускные",
+    "Прочее"
+  ],
+  "months": {
+    "2026-01": {
+      "workdays": {
+        "total": null,
+        "worked": null,
+        "vacation": null
+      },
+      "income": [
+        {
+          "id": "inc-1-2",
+          "label": "ЗП декабрь",
+          "amount": 215000.0
+        },
+        {
+          "id": "inc-1-3",
+          "label": "Аванс января",
+          "amount": 55000.0
+        },
+        {
+          "id": "inc-1-4",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-1-5",
+          "label": "Брокер+вклад",
+          "amount": 36101.0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-1-13",
+          "name": "Отложить",
+          "plan": 146101.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-18",
+          "name": "Покупки",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-19",
+          "name": "Отдых",
+          "plan": 27500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-20",
+          "name": "Бензин",
+          "plan": 15000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-21",
+          "name": "Баня",
+          "plan": 15000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-22",
+          "name": "Галя",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-1-24",
+          "name": "ДР мама",
+          "plan": 20000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-02": {
+      "workdays": {
+        "total": null,
+        "worked": null,
+        "vacation": null
+      },
+      "income": [
+        {
+          "id": "inc-2-8",
+          "label": "ЗП января",
+          "amount": 274000.0
+        },
+        {
+          "id": "inc-2-9",
+          "label": "Аванс февраля",
+          "amount": 110000.0
+        },
+        {
+          "id": "inc-2-10",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-2-11",
+          "label": "Брокер+вклад",
+          "amount": 14461.0
+        },
+        {
+          "id": "inc-2-12",
+          "label": "Отпускные+материалка",
+          "amount": 574000.0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-2-13",
+          "name": "Отложить",
+          "plan": 145870.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-14",
+          "name": "Жили были",
+          "plan": 50000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-18",
+          "name": "Покупки",
+          "plan": 24000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-19",
+          "name": "Отдых",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-21",
+          "name": "Баня",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-22",
+          "name": "Дети",
+          "plan": 30000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-23",
+          "name": "Непланируемые",
+          "plan": 19130.0,
+          "fact": null
+        },
+        {
+          "id": "exp-2-24",
+          "name": "ДР арсений",
+          "plan": 22500.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-03": {
+      "workdays": {
+        "total": 21,
+        "worked": 12,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-3-16",
+          "label": "ЗП февраля",
+          "amount": 194000.0
+        },
+        {
+          "id": "inc-3-17",
+          "label": "Аванс марта",
+          "amount": 0
+        },
+        {
+          "id": "inc-3-18",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-3-19",
+          "label": "Брокер+вклад",
+          "amount": 39085.04
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-3-13",
+          "name": "Отложить",
+          "plan": 71170.04,
+          "fact": null
+        },
+        {
+          "id": "exp-3-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-17",
+          "name": "Комуналка",
+          "plan": 26000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-18",
+          "name": "Покупки",
+          "plan": 30000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-19",
+          "name": "Отдых",
+          "plan": 8000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-21",
+          "name": "Баня",
+          "plan": 7500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-3-22",
+          "name": "Дети",
+          "plan": 10000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-04": {
+      "workdays": {
+        "total": 22,
+        "worked": 22,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-4-22",
+          "label": "ЗП марта",
+          "amount": 188000.0
+        },
+        {
+          "id": "inc-4-23",
+          "label": "Аванс апреля",
+          "amount": 115000.0
+        },
+        {
+          "id": "inc-4-24",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-4-25",
+          "label": "Брокер",
+          "amount": 24695.0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-4-13",
+          "name": "Отложить",
+          "plan": 118000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-14",
+          "name": "Жили были",
+          "plan": 30000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-15",
+          "name": "Ипотека",
+          "plan": 61000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-17",
+          "name": "Комуналка",
+          "plan": 26000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-18",
+          "name": "Отдых",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-19",
+          "name": "Отдых",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-20",
+          "name": "Бензин",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-21",
+          "name": "Баня",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-22",
+          "name": "Дети",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-4-23",
+          "name": "Отпуск",
+          "plan": 16000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-05": {
+      "workdays": {
+        "total": 19,
+        "worked": 10,
+        "vacation": 8
+      },
+      "income": [
+        {
+          "id": "inc-5-28",
+          "label": "ЗП апреля",
+          "amount": 214000.0
+        },
+        {
+          "id": "inc-5-29",
+          "label": "Аванс мая",
+          "amount": 0
+        },
+        {
+          "id": "inc-5-30",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-5-31",
+          "label": "Брокер",
+          "amount": 32205.73
+        },
+        {
+          "id": "inc-5-32",
+          "label": "13-я ЗП",
+          "amount": 386000.0
+        },
+        {
+          "id": "inc-5-33",
+          "label": "Отпуск",
+          "amount": 106000.0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-5-13",
+          "name": "Отложить",
+          "plan": 118000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-15",
+          "name": "Ипотека",
+          "plan": 15000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-17",
+          "name": "Комуналка",
+          "plan": 37000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-18",
+          "name": "Покупки",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-19",
+          "name": "Отдых",
+          "plan": 117500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-21",
+          "name": "Баня",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-22",
+          "name": "ДР Яна",
+          "plan": 100000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-23",
+          "name": "Дети",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-5-24",
+          "name": "Отпуск",
+          "plan": 0.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-06": {
+      "workdays": {
+        "total": 21,
+        "worked": 14,
+        "vacation": 9
+      },
+      "income": [
+        {
+          "id": "inc-6-36",
+          "label": "ЗП мая",
+          "amount": 341824.0
+        },
+        {
+          "id": "inc-6-37",
+          "label": "Аванс июня",
+          "amount": 108351.0
+        },
+        {
+          "id": "inc-6-38",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-6-39",
+          "label": "Брокер",
+          "amount": 16980.0
+        },
+        {
+          "id": "inc-6-40",
+          "label": "Отпуск",
+          "amount": 247000.0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-6-13",
+          "name": "Отложить",
+          "plan": 168000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-18",
+          "name": "Покупки",
+          "plan": 50000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-19",
+          "name": "карина+костюм",
+          "plan": 7342.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-20",
+          "name": "Бензин",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-21",
+          "name": "Баня",
+          "plan": 1000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-22",
+          "name": "Вернуть арсению",
+          "plan": 35000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-23",
+          "name": "Вернуть себе",
+          "plan": 116799.0,
+          "fact": null
+        },
+        {
+          "id": "exp-6-24",
+          "name": "Отпуск",
+          "plan": 10000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-07": {
+      "workdays": {
+        "total": 23,
+        "worked": 15,
+        "vacation": 10
+      },
+      "income": [
+        {
+          "id": "inc-7-43",
+          "label": "ЗП июня",
+          "amount": 110982.0
+        },
+        {
+          "id": "inc-7-44",
+          "label": "Аванс июль",
+          "amount": 59971.0
+        },
+        {
+          "id": "inc-7-45",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-7-46",
+          "label": "Брокер",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-7-13",
+          "name": "Отложить",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-14",
+          "name": "Жили были",
+          "plan": 30000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-15",
+          "name": "Ипотека",
+          "plan": 76000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-16",
+          "name": "Инет, связи",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-17",
+          "name": "Комуналка",
+          "plan": 41471.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-18",
+          "name": "Покупки",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-19",
+          "name": "Отдых",
+          "plan": 6833.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-20",
+          "name": "Бензин",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-21",
+          "name": "Баня",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-7-24",
+          "name": "Отпуск",
+          "plan": 0.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-08": {
+      "workdays": {
+        "total": 21,
+        "worked": 21,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-8-49",
+          "label": "ЗП июль",
+          "amount": 303859.0
+        },
+        {
+          "id": "inc-8-50",
+          "label": "Аванс август",
+          "amount": 158151.0
+        },
+        {
+          "id": "inc-8-51",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-8-52",
+          "label": "Брокер",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-8-13",
+          "name": "Отложить",
+          "plan": 200000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-15",
+          "name": "Ипотека",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-17",
+          "name": "Комуналка",
+          "plan": 8180.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-18",
+          "name": "Покупки",
+          "plan": 11500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-19",
+          "name": "Отдых",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-21",
+          "name": "Баня",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-23",
+          "name": "ДР",
+          "plan": 30000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-8-24",
+          "name": "Отпуск",
+          "plan": 0.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-09": {
+      "workdays": {
+        "total": 22,
+        "worked": 22,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-9-55",
+          "label": "ЗП август",
+          "amount": 169000.0
+        },
+        {
+          "id": "inc-9-56",
+          "label": "Аванс сентябрь",
+          "amount": 201000.0
+        },
+        {
+          "id": "inc-9-57",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-9-58",
+          "label": "Брокер",
+          "amount": 0
+        },
+        {
+          "id": "inc-9-59",
+          "label": "Отпуск",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-9-13",
+          "name": "Отложить",
+          "plan": 90000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-16",
+          "name": "Инет, связи",
+          "plan": 0.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-17",
+          "name": "Комуналка",
+          "plan": 16349.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-18",
+          "name": "Покупки",
+          "plan": 21500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-19",
+          "name": "Отдых",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-20",
+          "name": "Бензин",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-21",
+          "name": "Баня",
+          "plan": 16927.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-22",
+          "name": "Дети",
+          "plan": 4000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-9-24",
+          "name": "Отпуск",
+          "plan": 0.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-10": {
+      "workdays": {
+        "total": 22,
+        "worked": 22,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-10-62",
+          "label": "ЗП сентябрь",
+          "amount": 215721.0
+        },
+        {
+          "id": "inc-10-63",
+          "label": "Аванс октябрь",
+          "amount": 164532.0
+        },
+        {
+          "id": "inc-10-64",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-10-65",
+          "label": "Брокер",
+          "amount": 56305.0
+        },
+        {
+          "id": "inc-10-66",
+          "label": "Отпуск",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-10-13",
+          "name": "Отложить",
+          "plan": 176305.7,
+          "fact": null
+        },
+        {
+          "id": "exp-10-14",
+          "name": "Жили были",
+          "plan": 329181.82,
+          "fact": null
+        },
+        {
+          "id": "exp-10-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-18",
+          "name": "Покупки",
+          "plan": 46500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-19",
+          "name": "Отдых",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-21",
+          "name": "Баня",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-22",
+          "name": "Дети",
+          "plan": 6000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-23",
+          "name": "Благотворительность",
+          "plan": 4532.0,
+          "fact": null
+        },
+        {
+          "id": "exp-10-24",
+          "name": "плавание",
+          "plan": 2000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-11": {
+      "workdays": {
+        "total": 20,
+        "worked": 6,
+        "vacation": 18
+      },
+      "income": [
+        {
+          "id": "inc-11-69",
+          "label": "ЗП октябрь",
+          "amount": 164468.0
+        },
+        {
+          "id": "inc-11-70",
+          "label": "Аванс ноябрь",
+          "amount": 164532.0
+        },
+        {
+          "id": "inc-11-71",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-11-72",
+          "label": "Брокер",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-11-13",
+          "name": "Отложить",
+          "plan": 141500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-18",
+          "name": "Покупки",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-19",
+          "name": "Отдых",
+          "plan": 13000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-21",
+          "name": "Баня",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-22",
+          "name": "Дети",
+          "plan": 12000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-23",
+          "name": "Карина ДР",
+          "plan": 8000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-11-24",
+          "name": "Бассей",
+          "plan": 2000.0,
+          "fact": null
+        }
+      ]
+    },
+    "2026-12": {
+      "workdays": {
+        "total": 22,
+        "worked": 22,
+        "vacation": 0
+      },
+      "income": [
+        {
+          "id": "inc-12-76",
+          "label": "ЗП ноябрь",
+          "amount": 164468.0
+        },
+        {
+          "id": "inc-12-77",
+          "label": "Аванс декабрь",
+          "amount": 164532.0
+        },
+        {
+          "id": "inc-12-78",
+          "label": "КВ",
+          "amount": 60000.0
+        },
+        {
+          "id": "inc-12-79",
+          "label": "Брокер",
+          "amount": 0
+        }
+      ],
+      "expenses": [
+        {
+          "id": "exp-12-13",
+          "name": "Отложить",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-14",
+          "name": "Жили были",
+          "plan": 60000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-15",
+          "name": "Ипотека",
+          "plan": 38000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-16",
+          "name": "Инет, связи",
+          "plan": 2500.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-17",
+          "name": "Комуналка",
+          "plan": 22000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-18",
+          "name": "Покупки",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-19",
+          "name": "Отдых",
+          "plan": 5000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-20",
+          "name": "Бензин",
+          "plan": 10000.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-21",
+          "name": "Баня",
+          "plan": 6200.0,
+          "fact": null
+        },
+        {
+          "id": "exp-12-24",
+          "name": "Отпуск",
+          "plan": 0.0,
+          "fact": null
+        }
+      ]
+    }
+  },
+  "salary": {
+    "netMonthly": 329000,
+    "advanceShare": 0.46,
+    "salaryShare": 0.54,
+    "advance": 149335,
+    "salary": 175306
+  }
+}

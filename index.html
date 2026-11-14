@@ -3,141 +3,145 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Личный бюджет — простой учёт доходов и расходов" />
-  <title>Личный бюджет</title>
+  <meta name="description" content="Бюджет 2026 — месячный план доходов и расходов" />
+  <title>Бюджет 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a5c4a'/%3E%3Cpath d='M16 40h32M20 40V24h8c6 0 6 8 0 8h-8M36 40V28h6c4 0 4 6 0 6h-6' stroke='%23e8f5f0' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
 
   <header class="hero">
-    <p class="hero-kicker">Rus89nur</p>
-    <h1 class="hero-brand">Личный бюджет</h1>
-    <p class="hero-lead">Доходы, расходы и баланс по месяцам — просто и наглядно.</p>
+    <p class="hero-kicker">как вкладка Бюджет_2026</p>
+    <h1 class="hero-brand">Бюджет 2026</h1>
+    <p class="hero-lead">Рабочие дни, ЗП и аванс, пассив, категории расходов и остаток — по месяцам.</p>
     <div class="hero-actions">
-      <button type="button" class="btn btn-primary" id="btnAdd">Добавить операцию</button>
-      <button type="button" class="btn btn-ghost" id="btnExport" title="Скачать резервную копию">Экспорт</button>
-      <label class="btn btn-ghost file-btn" title="Загрузить резервную копию">
+      <button type="button" class="btn btn-ghost" id="btnExport" title="Скачать JSON">Экспорт</button>
+      <label class="btn btn-ghost file-btn" title="Загрузить JSON">
         Импорт
         <input type="file" id="importFile" accept="application/json,.json" hidden />
       </label>
+      <button type="button" class="btn btn-ghost" id="btnReset" title="Вернуть данные из таблицы">Из таблицы</button>
     </div>
   </header>
 
   <main class="layout">
-    <section class="period-bar" aria-label="Период">
-      <label class="field-inline">
-        <span>Период</span>
-        <select id="periodSelect"></select>
-      </label>
-      <label class="field-inline">
-        <span>Тип</span>
-        <select id="typeFilter">
-          <option value="all">Все</option>
-          <option value="income">Доходы</option>
-          <option value="expense">Расходы</option>
-        </select>
-      </label>
-      <label class="field-inline grow">
-        <span>Категория</span>
-        <select id="categoryFilter">
-          <option value="all">Все категории</option>
-        </select>
-      </label>
-    </section>
+    <nav class="month-nav" aria-label="Месяцы 2026" id="monthNav"></nav>
 
-    <section class="totals" aria-live="polite">
-      <div class="total-block">
-        <span class="total-label">Баланс периода</span>
-        <strong class="total-value" id="balanceValue">0 ₽</strong>
+    <section class="month-head" aria-live="polite">
+      <div>
+        <h2 class="month-title" id="monthTitle">январь 2026</h2>
+        <p class="month-hint" id="monthHint">Данные из вашей таблицы Numbers · правятся прямо здесь</p>
       </div>
-      <div class="total-block income">
-        <span class="total-label">Доходы</span>
-        <strong class="total-value" id="incomeValue">0 ₽</strong>
-      </div>
-      <div class="total-block expense">
-        <span class="total-label">Расходы</span>
-        <strong class="total-value" id="expenseValue">0 ₽</strong>
-      </div>
-      <div class="total-block muted">
-        <span class="total-label">Накопительный остаток</span>
-        <strong class="total-value" id="runningValue">0 ₽</strong>
+      <div class="summary" id="summary">
+        <div class="sum-item">
+          <span>Доходы</span>
+          <strong id="sumIncome">0 ₽</strong>
+        </div>
+        <div class="sum-item expense">
+          <span>Расходы · план</span>
+          <strong id="sumPlan">0 ₽</strong>
+        </div>
+        <div class="sum-item expense">
+          <span>Расходы · факт</span>
+          <strong id="sumFact">—</strong>
+        </div>
+        <div class="sum-item remain">
+          <span>Остаток</span>
+          <strong id="sumRemain">0 ₽</strong>
+        </div>
       </div>
     </section>
 
-    <section class="list-section">
-      <div class="list-head">
-        <h2>Операции</h2>
-        <p class="list-hint" id="listHint">Данные хранятся только в этом браузере</p>
+    <section class="panel workdays" aria-labelledby="workTitle">
+      <div class="panel-head">
+        <h3 id="workTitle">Рабочие дни</h3>
+        <p>Как в таблице: всего / работаю / отпуск</p>
       </div>
-      <ul class="tx-list" id="txList"></ul>
-      <p class="empty" id="emptyState" hidden>Пока нет операций за выбранный период. Нажмите «Добавить операцию».</p>
+      <div class="work-grid">
+        <label class="field">
+          <span>Всего раб. дней</span>
+          <input type="text" inputmode="numeric" id="workTotal" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Работаю</span>
+          <input type="text" inputmode="numeric" id="workWorked" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Отпуск</span>
+          <input type="text" inputmode="numeric" id="workVacation" autocomplete="off" />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel income-panel" aria-labelledby="incomeTitle">
+      <div class="panel-head">
+        <div>
+          <h3 id="incomeTitle">Доходы · ЗП + пассив</h3>
+          <p>ЗП предыдущего месяца, аванс, КВ, брокер / вклад и прочее</p>
+        </div>
+        <button type="button" class="btn btn-small" id="btnAddIncome">+ доход</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="incomeTable">
+          <thead>
+            <tr>
+              <th>Источник</th>
+              <th class="num">Сумма</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody id="incomeBody"></tbody>
+          <tfoot>
+            <tr>
+              <th>Итого доходов</th>
+              <th class="num" id="incomeTotal">0 ₽</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel expense-panel" aria-labelledby="expenseTitle">
+      <div class="panel-head">
+        <div>
+          <h3 id="expenseTitle">Расходы</h3>
+          <p>План как в Бюджет_2026 · факт — когда потратили</p>
+        </div>
+        <button type="button" class="btn btn-small" id="btnAddExpense">+ категория</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="expenseTable">
+          <thead>
+            <tr>
+              <th>Категория</th>
+              <th class="num">План</th>
+              <th class="num">Факт</th>
+              <th class="num">Δ</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody id="expenseBody"></tbody>
+          <tfoot>
+            <tr>
+              <th>Итого расходов</th>
+              <th class="num" id="expensePlanTotal">0 ₽</th>
+              <th class="num" id="expenseFactTotal">—</th>
+              <th class="num" id="expenseDeltaTotal">—</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </section>
   </main>
 
-  <dialog class="sheet" id="txDialog">
-    <form id="txForm" class="sheet-form" action="#" novalidate>
-      <header class="sheet-head">
-        <h2 id="dialogTitle">Новая операция</h2>
-        <button type="button" class="icon-btn" id="btnCloseDialog" aria-label="Закрыть">×</button>
-      </header>
-
-      <div class="type-toggle" role="group" aria-label="Тип операции">
-        <label class="toggle-opt">
-          <input type="radio" name="type" value="income" />
-          <span>Доход</span>
-        </label>
-        <label class="toggle-opt">
-          <input type="radio" name="type" value="expense" checked />
-          <span>Расход</span>
-        </label>
-      </div>
-
-      <label class="field">
-        <span>Сумма, ₽</span>
-        <input
-          type="text"
-          name="amount"
-          id="amountInput"
-          inputmode="decimal"
-          autocomplete="off"
-          required
-          placeholder="Например, 1000"
-        />
-      </label>
-
-      <label class="field">
-        <span>Категория</span>
-        <select name="category" id="categoryInput" required></select>
-      </label>
-
-      <label class="field">
-        <span>Дата</span>
-        <input type="date" name="date" id="dateInput" required />
-      </label>
-
-      <label class="field">
-        <span>Комментарий</span>
-        <input type="text" name="note" id="noteInput" maxlength="120" placeholder="Необязательно" autocomplete="off" />
-      </label>
-
-      <p class="form-error" id="formError" hidden></p>
-
-      <footer class="sheet-actions">
-        <button type="button" class="btn btn-danger" id="btnDelete" hidden>Удалить</button>
-        <div class="spacer"></div>
-        <button type="button" class="btn btn-ghost" id="btnCancel">Отмена</button>
-        <button type="submit" class="btn btn-primary" id="btnSave">Сохранить</button>
-      </footer>
-    </form>
-  </dialog>
-
   <footer class="site-foot">
-    <p>Личный бюджет · данные в localStorage этого устройства</p>
+    <p>Бюджет 2026 · хранится в localStorage этого устройства · GitHub Pages</p>
   </footer>
 
   <script src="app.js"></script>

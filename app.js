@@ -1,398 +1,375 @@
 (() => {
-  const STORAGE_KEY = "personal-budget-v1";
-
-  const INCOME_CATEGORIES = [
-    "ЗП",
-    "Аванс",
-    "Пассив",
-    "Вклад",
-    "Брокерский счет",
-    "Квартира",
-    "Гараж",
-    "Дивиденды",
-    "Отпускные",
-    "Прочее",
-  ];
-
-  const EXPENSE_CATEGORIES = [
-    "Жили были",
-    "Ипотека",
-    "Связь",
-    "Комуналка",
-    "Отложить",
-    "Покупки",
-    "Отдых",
-    "Бензин",
-    "Тренировка",
-    "Баня",
-    "Дети",
-    "Непланируемые",
-    "Страховки",
-    "Прочее",
-  ];
+  const STORAGE_KEY = "personal-budget-v2";
+  const YEAR = 2026;
 
   const MONTHS_RU = [
     "январь", "февраль", "март", "апрель", "май", "июнь",
     "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
   ];
 
+  const MONTHS_SHORT = [
+    "янв", "фев", "мар", "апр", "май", "июн",
+    "июл", "авг", "сен", "окт", "ноя", "дек",
+  ];
+
   const els = {
-    periodSelect: document.getElementById("periodSelect"),
-    typeFilter: document.getElementById("typeFilter"),
-    categoryFilter: document.getElementById("categoryFilter"),
-    balanceValue: document.getElementById("balanceValue"),
-    incomeValue: document.getElementById("incomeValue"),
-    expenseValue: document.getElementById("expenseValue"),
-    runningValue: document.getElementById("runningValue"),
-    txList: document.getElementById("txList"),
-    emptyState: document.getElementById("emptyState"),
-    listHint: document.getElementById("listHint"),
-    btnAdd: document.getElementById("btnAdd"),
+    monthNav: document.getElementById("monthNav"),
+    monthTitle: document.getElementById("monthTitle"),
+    monthHint: document.getElementById("monthHint"),
+    sumIncome: document.getElementById("sumIncome"),
+    sumPlan: document.getElementById("sumPlan"),
+    sumFact: document.getElementById("sumFact"),
+    sumRemain: document.getElementById("sumRemain"),
+    workTotal: document.getElementById("workTotal"),
+    workWorked: document.getElementById("workWorked"),
+    workVacation: document.getElementById("workVacation"),
+    incomeBody: document.getElementById("incomeBody"),
+    incomeTotal: document.getElementById("incomeTotal"),
+    expenseBody: document.getElementById("expenseBody"),
+    expensePlanTotal: document.getElementById("expensePlanTotal"),
+    expenseFactTotal: document.getElementById("expenseFactTotal"),
+    expenseDeltaTotal: document.getElementById("expenseDeltaTotal"),
+    btnAddIncome: document.getElementById("btnAddIncome"),
+    btnAddExpense: document.getElementById("btnAddExpense"),
     btnExport: document.getElementById("btnExport"),
     importFile: document.getElementById("importFile"),
-    dialog: document.getElementById("txDialog"),
-    form: document.getElementById("txForm"),
-    dialogTitle: document.getElementById("dialogTitle"),
-    amountInput: document.getElementById("amountInput"),
-    categoryInput: document.getElementById("categoryInput"),
-    dateInput: document.getElementById("dateInput"),
-    noteInput: document.getElementById("noteInput"),
-    formError: document.getElementById("formError"),
-    btnDelete: document.getElementById("btnDelete"),
-    btnCancel: document.getElementById("btnCancel"),
-    btnCloseDialog: document.getElementById("btnCloseDialog"),
+    btnReset: document.getElementById("btnReset"),
   };
 
-  let state = loadState();
-  let editingId = null;
+  let seedTemplate = null;
+  let state = null;
 
-  function uid() {
-    return crypto.randomUUID ? crypto.randomUUID() : `tx_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  function uid(prefix) {
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
   }
 
-  function todayISO() {
-    const d = new Date();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${d.getFullYear()}-${m}-${day}`;
+  function monthKeys() {
+    return Array.from({ length: 12 }, (_, i) => `${YEAR}-${String(i + 1).padStart(2, "0")}`);
   }
 
-  function sampleSeed() {
-    const y = new Date().getFullYear();
-    const m = String(new Date().getMonth() + 1).padStart(2, "0");
-    return [
-      { id: uid(), type: "income", category: "ЗП", amount: 175000, date: `${y}-${m}-05`, note: "Зарплата" },
-      { id: uid(), type: "income", category: "Аванс", amount: 149000, date: `${y}-${m}-20`, note: "" },
-      { id: uid(), type: "income", category: "Пассив", amount: 66000, date: `${y}-${m}-01`, note: "Квартиры + вклад + гараж" },
-      { id: uid(), type: "expense", category: "Жили были", amount: 60000, date: `${y}-${m}-03`, note: "" },
-      { id: uid(), type: "expense", category: "Ипотека", amount: 38000, date: `${y}-${m}-10`, note: "" },
-      { id: uid(), type: "expense", category: "Комуналка", amount: 26000, date: `${y}-${m}-12`, note: "" },
-      { id: uid(), type: "expense", category: "Связь", amount: 2500, date: `${y}-${m}-08`, note: "Инет, связи" },
-      { id: uid(), type: "expense", category: "Отложить", amount: 100000, date: `${y}-${m}-06`, note: "Пополнение БС" },
-      { id: uid(), type: "expense", category: "Покупки", amount: 20000, date: `${y}-${m}-15`, note: "" },
-      { id: uid(), type: "expense", category: "Бензин", amount: 10000, date: `${y}-${m}-14`, note: "" },
-      { id: uid(), type: "expense", category: "Отдых", amount: 15000, date: `${y}-${m}-18`, note: "" },
-      { id: uid(), type: "expense", category: "Баня", amount: 10000, date: `${y}-${m}-22`, note: "" },
-    ];
+  function emptyMonth() {
+    return {
+      workdays: { total: null, worked: null, vacation: null },
+      income: [
+        { id: uid("inc"), label: "ЗП", amount: 0 },
+        { id: uid("inc"), label: "Аванс", amount: 0 },
+        { id: uid("inc"), label: "КВ", amount: 0 },
+        { id: uid("inc"), label: "Брокер", amount: 0 },
+      ],
+      expenses: [
+        { id: uid("exp"), name: "Отложить", plan: 0, fact: null },
+        { id: uid("exp"), name: "Жили были", plan: 0, fact: null },
+        { id: uid("exp"), name: "Ипотека", plan: 0, fact: null },
+        { id: uid("exp"), name: "Инет, связи", plan: 0, fact: null },
+        { id: uid("exp"), name: "Комуналка", plan: 0, fact: null },
+        { id: uid("exp"), name: "Покупки", plan: 0, fact: null },
+        { id: uid("exp"), name: "Отдых", plan: 0, fact: null },
+        { id: uid("exp"), name: "Бензин", plan: 0, fact: null },
+        { id: uid("exp"), name: "Баня", plan: 0, fact: null },
+      ],
+    };
   }
 
-  function loadState() {
+  function cloneSeedMonths(seed) {
+    const months = {};
+    for (const key of monthKeys()) {
+      const src = seed?.months?.[key];
+      if (!src) {
+        months[key] = emptyMonth();
+        continue;
+      }
+      months[key] = {
+        workdays: {
+          total: src.workdays?.total ?? null,
+          worked: src.workdays?.worked ?? null,
+          vacation: src.workdays?.vacation ?? null,
+        },
+        income: (src.income || []).map((row) => ({
+          id: row.id || uid("inc"),
+          label: String(row.label || "Прочее"),
+          amount: Number(row.amount) || 0,
+        })),
+        expenses: (src.expenses || [])
+          .filter((row) => row && row.name && String(row.name).toLowerCase() !== "остаток")
+          .map((row) => ({
+            id: row.id || uid("exp"),
+            name: String(row.name),
+            plan: Number(row.plan) || 0,
+            fact: row.fact == null || row.fact === "" ? null : Number(row.fact),
+          })),
+      };
+    }
+    return months;
+  }
+
+  function currentMonthKey() {
+    const now = new Date();
+    if (now.getFullYear() === YEAR) {
+      return `${YEAR}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    }
+    return `${YEAR}-01`;
+  }
+
+  function buildStateFromSeed(seed, seeded = true) {
+    return {
+      version: 2,
+      year: YEAR,
+      currentMonth: currentMonthKey(),
+      seeded,
+      months: cloneSeedMonths(seed),
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  function loadState(seed) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return { transactions: sampleSeed(), seeded: true };
-      }
+      if (!raw) return buildStateFromSeed(seed, true);
       const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.transactions)) {
-        return { transactions: sampleSeed(), seeded: true };
+      if (!parsed || parsed.version !== 2 || !parsed.months) {
+        return buildStateFromSeed(seed, true);
       }
-      return { transactions: parsed.transactions, seeded: Boolean(parsed.seeded) };
+      for (const key of monthKeys()) {
+        if (!parsed.months[key]) parsed.months[key] = emptyMonth();
+      }
+      if (!monthKeys().includes(parsed.currentMonth)) {
+        parsed.currentMonth = currentMonthKey();
+      }
+      return parsed;
     } catch {
-      return { transactions: sampleSeed(), seeded: true };
+      return buildStateFromSeed(seed, true);
     }
   }
 
   function saveState() {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ transactions: state.transactions, seeded: state.seeded, savedAt: new Date().toISOString() })
-    );
+    state.savedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
   function money(n) {
+    if (n == null || Number.isNaN(n)) return "—";
     const abs = Math.abs(n);
     const formatted = abs.toLocaleString("ru-RU", {
       minimumFractionDigits: abs % 1 === 0 ? 0 : 2,
       maximumFractionDigits: 2,
     });
-    return `${formatted} ₽`;
+    const sign = n < 0 ? "−" : "";
+    return `${sign}${formatted} ₽`;
   }
 
-  function periodKey(dateStr) {
-    return dateStr.slice(0, 7);
+  function parseNumber(raw) {
+    const text = String(raw ?? "").trim().replace(/\s+/g, "").replace(",", ".");
+    if (!text) return null;
+    const n = Number(text);
+    return Number.isFinite(n) ? n : null;
   }
 
-  function periodLabel(key) {
-    if (key === "all") return "Все время";
-    const [y, m] = key.split("-");
-    const month = MONTHS_RU[Number(m) - 1] || m;
-    return `${month} ${y}`;
+  function monthLabel(key) {
+    const m = Number(key.slice(5, 7));
+    return `${MONTHS_RU[m - 1]} ${YEAR}`;
   }
 
-  function categoriesFor(type) {
-    return type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  function activeMonth() {
+    return state.months[state.currentMonth];
   }
 
-  function fillCategorySelect(select, type, selected) {
-    const cats = categoriesFor(type);
-    select.innerHTML = cats.map((c) => `<option value="${c}">${c}</option>`).join("");
-    if (selected && cats.includes(selected)) select.value = selected;
+  function totals(month) {
+    const income = month.income.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const plan = month.expenses.reduce((s, r) => s + (Number(r.plan) || 0), 0);
+    const factRows = month.expenses.filter((r) => r.fact != null && r.fact !== "");
+    const fact = factRows.length
+      ? month.expenses.reduce((s, r) => s + (r.fact == null ? 0 : Number(r.fact) || 0), 0)
+      : null;
+    const remain = income - plan;
+    const remainFact = fact == null ? null : income - fact;
+    return { income, plan, fact, remain, remainFact, factCount: factRows.length };
   }
 
-  function fillFilters() {
-    const periods = new Set(state.transactions.map((t) => periodKey(t.date)));
-    const current = todayISO().slice(0, 7);
-    periods.add(current);
-    const sorted = [...periods].sort((a, b) => b.localeCompare(a));
-
-    const previous = els.periodSelect.value || current;
-    els.periodSelect.innerHTML =
-      `<option value="all">Все время</option>` +
-      sorted.map((p) => `<option value="${p}">${periodLabel(p)}</option>`).join("");
-    els.periodSelect.value = [...els.periodSelect.options].some((o) => o.value === previous)
-      ? previous
-      : current;
-
-    const type = els.typeFilter.value;
-    const cats =
-      type === "income" ? INCOME_CATEGORIES : type === "expense" ? EXPENSE_CATEGORIES : [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
-    const unique = [...new Set(cats)];
-    const prevCat = els.categoryFilter.value;
-    els.categoryFilter.innerHTML =
-      `<option value="all">Все категории</option>` +
-      unique.map((c) => `<option value="${c}">${c}</option>`).join("");
-    els.categoryFilter.value = [...els.categoryFilter.options].some((o) => o.value === prevCat)
-      ? prevCat
-      : "all";
+  function renderMonthNav() {
+    els.monthNav.innerHTML = "";
+    monthKeys().forEach((key, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `month-chip${key === state.currentMonth ? " active" : ""}`;
+      btn.textContent = MONTHS_SHORT[index];
+      btn.setAttribute("aria-pressed", key === state.currentMonth ? "true" : "false");
+      btn.addEventListener("click", () => {
+        state.currentMonth = key;
+        saveState();
+        render();
+      });
+      els.monthNav.appendChild(btn);
+    });
   }
 
-  function filteredTransactions() {
-    const period = els.periodSelect.value;
-    const type = els.typeFilter.value;
-    const category = els.categoryFilter.value;
-    return state.transactions
-      .filter((t) => (period === "all" ? true : periodKey(t.date) === period))
-      .filter((t) => (type === "all" ? true : t.type === type))
-      .filter((t) => (category === "all" ? true : t.category === category))
-      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  function bindWorkdays(month) {
+    const map = [
+      [els.workTotal, "total"],
+      [els.workWorked, "worked"],
+      [els.workVacation, "vacation"],
+    ];
+    map.forEach(([input, key]) => {
+      const value = month.workdays[key];
+      input.value = value == null ? "" : String(value);
+      input.oninput = () => {
+        month.workdays[key] = parseNumber(input.value);
+        state.seeded = false;
+        saveState();
+      };
+    });
   }
 
-  function computeTotals(list) {
-    let income = 0;
-    let expense = 0;
-    for (const t of list) {
-      if (t.type === "income") income += t.amount;
-      else expense += t.amount;
-    }
-    return { income, expense, balance: income - expense };
+  function renderIncome(month) {
+    els.incomeBody.innerHTML = "";
+    month.income.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-field="amount" /></td>
+        <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
+      `;
+      const labelInput = tr.querySelector('[data-field="label"]');
+      const amountInput = tr.querySelector('[data-field="amount"]');
+      labelInput.addEventListener("change", () => {
+        row.label = labelInput.value.trim() || "Прочее";
+        state.seeded = false;
+        saveState();
+      });
+      amountInput.addEventListener("change", () => {
+        row.amount = parseNumber(amountInput.value) || 0;
+        amountInput.value = formatEditable(row.amount);
+        state.seeded = false;
+        saveState();
+        refreshTotalsOnly();
+      });
+      tr.querySelector('[data-act="del"]').addEventListener("click", () => {
+        month.income = month.income.filter((r) => r.id !== row.id);
+        state.seeded = false;
+        saveState();
+        render();
+      });
+      els.incomeBody.appendChild(tr);
+    });
   }
 
-  function runningBalance() {
-    const sorted = [...state.transactions].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-    let total = 0;
-    for (const t of sorted) {
-      total += t.type === "income" ? t.amount : -t.amount;
-    }
-    return total;
+  function renderExpenses(month) {
+    els.expenseBody.innerHTML = "";
+    month.expenses.forEach((row) => {
+      const delta = row.fact == null ? null : (Number(row.fact) || 0) - (Number(row.plan) || 0);
+      const deltaClass =
+        delta == null ? "delta-zero" : delta > 0 ? "delta-neg" : delta < 0 ? "delta-pos" : "delta-zero";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.plan)}" data-field="plan" /></td>
+        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${row.fact == null ? "" : formatEditable(row.fact)}" placeholder="—" data-field="fact" /></td>
+        <td class="num ${deltaClass}" data-delta>${delta == null ? "—" : money(delta)}</td>
+        <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
+      `;
+      const nameInput = tr.querySelector('[data-field="name"]');
+      const planInput = tr.querySelector('[data-field="plan"]');
+      const factInput = tr.querySelector('[data-field="fact"]');
+      const deltaCell = tr.querySelector("[data-delta]");
+
+      nameInput.addEventListener("change", () => {
+        row.name = nameInput.value.trim() || "Прочее";
+        state.seeded = false;
+        saveState();
+      });
+
+      const syncRow = () => {
+        const d = row.fact == null ? null : (Number(row.fact) || 0) - (Number(row.plan) || 0);
+        deltaCell.textContent = d == null ? "—" : money(d);
+        deltaCell.className = `num ${d == null ? "delta-zero" : d > 0 ? "delta-neg" : d < 0 ? "delta-pos" : "delta-zero"}`;
+        refreshTotalsOnly();
+      };
+
+      planInput.addEventListener("change", () => {
+        row.plan = parseNumber(planInput.value) || 0;
+        planInput.value = formatEditable(row.plan);
+        state.seeded = false;
+        saveState();
+        syncRow();
+      });
+
+      factInput.addEventListener("change", () => {
+        const parsed = parseNumber(factInput.value);
+        row.fact = parsed;
+        factInput.value = parsed == null ? "" : formatEditable(parsed);
+        state.seeded = false;
+        saveState();
+        syncRow();
+      });
+
+      tr.querySelector('[data-act="del"]').addEventListener("click", () => {
+        month.expenses = month.expenses.filter((r) => r.id !== row.id);
+        state.seeded = false;
+        saveState();
+        render();
+      });
+
+      els.expenseBody.appendChild(tr);
+    });
+  }
+
+  function refreshTotalsOnly() {
+    const month = activeMonth();
+    const t = totals(month);
+    els.sumIncome.textContent = money(t.income);
+    els.sumPlan.textContent = money(t.plan);
+    els.sumFact.textContent = t.fact == null ? "—" : money(t.fact);
+    els.sumRemain.textContent = money(t.remain);
+    els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
+    els.incomeTotal.textContent = money(t.income);
+    els.expensePlanTotal.textContent = money(t.plan);
+    els.expenseFactTotal.textContent = t.fact == null ? "—" : money(t.fact);
+    const deltaTotal = t.fact == null ? null : t.fact - t.plan;
+    els.expenseDeltaTotal.textContent = deltaTotal == null ? "—" : money(deltaTotal);
+    els.expenseDeltaTotal.className = `num ${
+      deltaTotal == null ? "delta-zero" : deltaTotal > 0 ? "delta-neg" : deltaTotal < 0 ? "delta-pos" : "delta-zero"
+    }`;
   }
 
   function render() {
-    fillFilters();
-    const list = filteredTransactions();
-    const totals = computeTotals(
-      state.transactions.filter((t) => {
-        const period = els.periodSelect.value;
-        return period === "all" ? true : periodKey(t.date) === period;
-      })
-    );
-
-    els.balanceValue.textContent = money(totals.balance);
-    els.incomeValue.textContent = money(totals.income);
-    els.expenseValue.textContent = money(totals.expense);
-    els.runningValue.textContent = money(runningBalance());
-    els.listHint.textContent = state.seeded
-      ? "Показаны примеры из вашей таблицы — можно править или удалить"
+    const month = activeMonth();
+    els.monthTitle.textContent = monthLabel(state.currentMonth);
+    els.monthHint.textContent = state.seeded
+      ? "Стартовые цифры из Бюджет_2026 — можно править, факт вводить отдельно"
       : "Данные хранятся только в этом браузере";
-
-    els.txList.innerHTML = "";
-    if (!list.length) {
-      els.emptyState.hidden = false;
-      return;
-    }
-    els.emptyState.hidden = true;
-
-    list.forEach((t, index) => {
-      const li = document.createElement("li");
-      li.className = "tx-item";
-      li.style.animationDelay = `${Math.min(index, 12) * 0.03}s`;
-      li.tabIndex = 0;
-      li.setAttribute("role", "button");
-      const sign = t.type === "income" ? "+" : "−";
-      const note = t.note ? ` · ${t.note}` : "";
-      li.innerHTML = `
-        <div class="tx-main">
-          <p class="tx-title">${escapeHtml(t.category)}</p>
-          <p class="tx-meta">${formatDate(t.date)}${escapeHtml(note)}</p>
-        </div>
-        <div class="tx-amount ${t.type}">${sign}${money(t.amount)}</div>
-      `;
-      li.addEventListener("click", () => openEdit(t.id));
-      li.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openEdit(t.id);
-        }
-      });
-      els.txList.appendChild(li);
-    });
+    renderMonthNav();
+    bindWorkdays(month);
+    renderIncome(month);
+    renderExpenses(month);
+    refreshTotalsOnly();
   }
 
-  function formatDate(iso) {
-    const [y, m, d] = iso.split("-");
-    return `${Number(d)} ${MONTHS_RU[Number(m) - 1]} ${y}`;
+  function formatEditable(n) {
+    if (n == null || Number.isNaN(n)) return "";
+    if (Math.abs(n % 1) < 1e-9) return String(Math.round(n));
+    return String(Math.round(n * 100) / 100);
   }
 
-  function escapeHtml(str) {
+  function escapeAttr(str) {
     return String(str)
       .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;")
       .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
-
-  function selectedType() {
-    const checked = els.form.querySelector('input[name="type"]:checked');
-    return checked ? checked.value : "expense";
-  }
-
-  function parseAmount(raw) {
-    const normalized = String(raw || "")
-      .trim()
-      .replace(/\s+/g, "")
-      .replace(",", ".");
-    if (!normalized) return NaN;
-    const amount = Number(normalized);
-    return Number.isFinite(amount) ? amount : NaN;
-  }
-
-  function showFormError(message) {
-    if (!els.formError) return;
-    if (!message) {
-      els.formError.hidden = true;
-      els.formError.textContent = "";
-      return;
-    }
-    els.formError.hidden = false;
-    els.formError.textContent = message;
-  }
-
-  function openCreate() {
-    editingId = null;
-    els.dialogTitle.textContent = "Новая операция";
-    els.btnDelete.hidden = true;
-    showFormError("");
-    els.form.querySelector('input[name="type"][value="expense"]').checked = true;
-    fillCategorySelect(els.categoryInput, "expense");
-    els.dateInput.value = todayISO();
-    els.amountInput.value = "";
-    els.noteInput.value = "";
-    els.dialog.showModal();
-    requestAnimationFrame(() => {
-      els.amountInput.focus({ preventScroll: true });
-      els.amountInput.select();
-    });
-  }
-
-  function openEdit(id) {
-    const tx = state.transactions.find((t) => t.id === id);
-    if (!tx) return;
-    editingId = id;
-    els.dialogTitle.textContent = "Редактирование";
-    els.btnDelete.hidden = false;
-    showFormError("");
-    els.form.querySelector(`input[name="type"][value="${tx.type}"]`).checked = true;
-    fillCategorySelect(els.categoryInput, tx.type, tx.category);
-    els.amountInput.value = String(tx.amount);
-    els.dateInput.value = tx.date;
-    els.noteInput.value = tx.note || "";
-    els.dialog.showModal();
-    requestAnimationFrame(() => {
-      els.amountInput.focus({ preventScroll: true });
-    });
-  }
-
-  function closeDialog() {
-    showFormError("");
-    if (els.dialog.open) els.dialog.close();
-  }
-
-  function upsertFromForm() {
-    const type = selectedType();
-    const amount = parseAmount(els.amountInput.value);
-    const category = els.categoryInput.value;
-    const date = els.dateInput.value;
-    const note = els.noteInput.value.trim();
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      showFormError("Введите сумму больше нуля");
-      els.amountInput.focus();
-      return;
-    }
-    if (!category) {
-      showFormError("Выберите категорию");
-      els.categoryInput.focus();
-      return;
-    }
-    if (!date) {
-      showFormError("Укажите дату");
-      els.dateInput.focus();
-      return;
-    }
-
-    showFormError("");
-
-    if (editingId) {
-      state.transactions = state.transactions.map((t) =>
-        t.id === editingId ? { ...t, type, amount, category, date, note } : t
-      );
-    } else {
-      state.transactions.push({ id: uid(), type, amount, category, date, note });
-    }
-    state.seeded = false;
-    saveState();
-    closeDialog();
-    render();
-  }
-
-  function deleteCurrent() {
-    if (!editingId) return;
-    if (!confirm("Удалить эту операцию?")) return;
-    state.transactions = state.transactions.filter((t) => t.id !== editingId);
-    state.seeded = false;
-    saveState();
-    closeDialog();
-    render();
+      .replaceAll(">", "&gt;");
   }
 
   function exportData() {
-    const blob = new Blob(
-      [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), transactions: state.transactions }, null, 2)],
-      { type: "application/json" }
-    );
+    const payload = {
+      version: 2,
+      year: YEAR,
+      source: "Бюджет_2026",
+      exportedAt: new Date().toISOString(),
+      months: state.months,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `lichnyy-budget-${todayISO()}.json`;
+    a.download = `budget-2026-${state.currentMonth}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -402,55 +379,84 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
-        const list = Array.isArray(data) ? data : data.transactions;
-        if (!Array.isArray(list)) throw new Error("bad format");
-        const normalized = list
-          .filter((t) => t && (t.type === "income" || t.type === "expense") && t.amount > 0 && t.date && t.category)
-          .map((t) => ({
-            id: t.id || uid(),
-            type: t.type,
-            amount: Number(t.amount),
-            category: String(t.category),
-            date: String(t.date).slice(0, 10),
-            note: t.note ? String(t.note) : "",
-          }));
-        if (!normalized.length) throw new Error("empty");
-        if (!confirm(`Импортировать ${normalized.length} операций? Текущие данные будут заменены.`)) return;
-        state = { transactions: normalized, seeded: false };
+        if (!data || typeof data !== "object") throw new Error("bad");
+        const months = data.months || data;
+        if (!months || typeof months !== "object") throw new Error("bad months");
+        const next = buildStateFromSeed({ months }, false);
+        for (const key of monthKeys()) {
+          if (months[key]) {
+            const src = months[key];
+            next.months[key] = {
+              workdays: {
+                total: src.workdays?.total ?? null,
+                worked: src.workdays?.worked ?? null,
+                vacation: src.workdays?.vacation ?? null,
+              },
+              income: (src.income || []).map((row) => ({
+                id: row.id || uid("inc"),
+                label: String(row.label || "Прочее"),
+                amount: Number(row.amount) || 0,
+              })),
+              expenses: (src.expenses || []).map((row) => ({
+                id: row.id || uid("exp"),
+                name: String(row.name || "Прочее"),
+                plan: Number(row.plan) || 0,
+                fact: row.fact == null || row.fact === "" ? null : Number(row.fact),
+              })),
+            };
+          }
+        }
+        if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
+        state = next;
         saveState();
         render();
       } catch {
-        alert("Не удалось прочитать файл. Нужен JSON, экспортированный из этого приложения.");
+        alert("Не удалось прочитать файл. Нужен JSON экспорта этого приложения.");
       }
     };
     reader.readAsText(file);
   }
 
-  els.btnAdd.addEventListener("click", openCreate);
-  els.btnCancel.addEventListener("click", closeDialog);
-  els.btnCloseDialog.addEventListener("click", closeDialog);
-  els.btnDelete.addEventListener("click", deleteCurrent);
+  function resetFromTable() {
+    if (!confirm("Вернуть все месяцы к цифрам из таблицы Бюджет_2026?")) return;
+    state = buildStateFromSeed(seedTemplate, true);
+    saveState();
+    render();
+  }
+
+  els.btnAddIncome.addEventListener("click", () => {
+    activeMonth().income.push({ id: uid("inc"), label: "Прочее", amount: 0 });
+    state.seeded = false;
+    saveState();
+    render();
+  });
+
+  els.btnAddExpense.addEventListener("click", () => {
+    activeMonth().expenses.push({ id: uid("exp"), name: "Прочее", plan: 0, fact: null });
+    state.seeded = false;
+    saveState();
+    render();
+  });
+
   els.btnExport.addEventListener("click", exportData);
+  els.btnReset.addEventListener("click", resetFromTable);
   els.importFile.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) importData(file);
     e.target.value = "";
   });
 
-  els.form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    upsertFromForm();
-  });
+  async function boot() {
+    try {
+      const res = await fetch("./seed-data.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("seed missing");
+      seedTemplate = await res.json();
+    } catch {
+      seedTemplate = { version: 2, year: YEAR, months: {} };
+    }
+    state = loadState(seedTemplate);
+    render();
+  }
 
-  els.form.querySelectorAll('input[name="type"]').forEach((input) => {
-    input.addEventListener("change", () => {
-      fillCategorySelect(els.categoryInput, selectedType());
-    });
-  });
-
-  [els.periodSelect, els.typeFilter, els.categoryFilter].forEach((el) => {
-    el.addEventListener("change", render);
-  });
-
-  render();
+  boot();
 })();
