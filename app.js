@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.2";
+  const APP_VERSION = "1.4.5";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -205,17 +205,36 @@
   function inheritExpenses(month, prev) {
     month.expenses.forEach(normalizeExpense);
     if (prev) prev.expenses.forEach(normalizeExpense);
-    month.expenses.forEach((row) => {
-      const src = prev && prev.expenses.find(
-        (item) => String(item.name).trim().toLowerCase() === String(row.name).trim().toLowerCase()
-      );
-      if (!src) return;
-      if (!row.planManual) row.plan = src.plan == null || src.plan === "" ? null : Number(src.plan) || 0;
-      Object.entries(src.shares || {}).forEach(([key, value]) => {
-        if (row.sharesManual[key]) return;
-        row.shares[key] = value == null || value === "" ? null : Number(value) || 0;
-      });
-    });
+  }
+
+  function cellManual(row, key) {
+    return key === "plan" ? Boolean(row.planManual) : Boolean(row.sharesManual?.[key]);
+  }
+
+  function cellValue(row, key) {
+    if (!cellManual(row, key)) return null;
+    const value = key === "plan" ? row.plan : row.shares?.[key];
+    if (value == null || value === "") return null;
+    return Number(value) || 0;
+  }
+
+  function previousExpenseMonth() {
+    const key = state.currentMonth;
+    const year = yearOf(key);
+    const index = Number(key.slice(5, 7)) - 1;
+    if (index <= 0) return state.years[year - 1]?.months[`${year - 1}-12`] || null;
+    return state.years[year]?.months[`${year}-${String(index).padStart(2, "0")}`] || null;
+  }
+
+  function suggestionFor(row, key) {
+    const prev = previousExpenseMonth();
+    if (!prev) return null;
+    const src = prev.expenses.find(
+      (item) => String(item.name).trim().toLowerCase() === String(row.name).trim().toLowerCase()
+    );
+    if (!src) return null;
+    normalizeExpense(src);
+    return cellValue(src, key);
   }
 
   function refreshExpenseDefaults() {
@@ -805,6 +824,49 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  function isPlainZero(value) {
+    return /^-?0(?:[.,]0*)?$/.test(String(value).trim());
+  }
+
+  function isNumericField(el) {
+    return el instanceof HTMLInputElement
+      && el.type === "text"
+      && !el.readOnly
+      && (el.classList.contains("num-input") || el.inputMode === "numeric" || el.inputMode === "decimal");
+  }
+
+  document.addEventListener("focusin", (event) => {
+    const input = event.target;
+    if (!isNumericField(input)) return;
+    if (!isPlainZero(input.value)) {
+      delete input.dataset.zeroArmed;
+      return;
+    }
+    input.dataset.zeroArmed = "1";
+    input.select();
+  });
+
+  document.addEventListener("mouseup", (event) => {
+    const input = event.target;
+    if (!isNumericField(input) || input.dataset.zeroArmed !== "1") return;
+    event.preventDefault();
+  });
+
+  document.addEventListener("input", (event) => {
+    const input = event.target;
+    if (!isNumericField(input) || input.dataset.keepEmpty === "1") return;
+    const raw = input.value;
+    if (raw.trim() === "") {
+      if (input.closest("#expenseTable")) return;
+      input.value = "0";
+      input.dataset.zeroArmed = "1";
+      input.select();
+      return;
+    }
+    if (input.dataset.zeroArmed === "1" && /^0\d/.test(raw)) input.value = raw.slice(1);
+    delete input.dataset.zeroArmed;
+  });
+
   function monthLabel(key) {
     const m = Number(key.slice(5, 7));
     return `${MONTHS_RU[m - 1]} ${yearOf(key)}`;
@@ -817,7 +879,7 @@
   function columnSum(month, key) {
     return month.expenses.reduce((sum, row) => {
       normalizeExpense(row);
-      const value = key === "plan" ? row.plan : row.shares[key];
+      const value = cellValue(row, key);
       return sum + (Number(value) || 0);
     }, 0);
   }
@@ -1102,11 +1164,20 @@
   }
 
   function shareInput(row, key) {
-    const manual = key === "plan" ? row.planManual : row.sharesManual[key];
-    const value = key === "plan" ? row.plan : row.shares[key];
-    const shown = value == null || value === "" ? "" : formatEditable(value);
-    const tone = manual ? "" : " is-inherited";
-    return `<input class="num-input${tone}" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" />`;
+    const value = cellValue(row, key);
+    const shown = value == null ? "" : formatEditable(value);
+    return `<input class="num-input" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" />`;
+  }
+
+  function writeExpenseCell(row, key, parsed) {
+    if (key === "plan") {
+      row.plan = parsed;
+      row.planManual = parsed != null;
+    } else {
+      if (parsed == null) delete row.shares[key];
+      else row.shares[key] = parsed;
+      row.sharesManual[key] = parsed != null;
+    }
   }
 
   function renderExpenses(month) {
@@ -1163,22 +1234,59 @@
         render();
       });
       tr.querySelectorAll("[data-key]").forEach((input) => {
-        input.addEventListener("change", () => {
-          const key = input.dataset.key;
-          const parsed = parseNumber(input.value);
-          if (key === "plan") {
-            row.plan = parsed;
-            row.planManual = true;
-          } else {
-            if (parsed == null) delete row.shares[key];
-            else row.shares[key] = parsed;
-            row.sharesManual[key] = true;
-          }
+        const key = input.dataset.key;
+        let arming = false;
+
+        const commitCell = (parsed) => {
+          writeExpenseCell(row, key, parsed);
           input.value = parsed == null ? "" : formatEditable(parsed);
-          input.classList.remove("is-inherited");
+          input.classList.remove("is-suggestion");
+          delete input.dataset.pending;
           state.seeded = false;
           saveState();
           refreshTotalsOnly();
+        };
+
+        input.addEventListener("focus", () => {
+          if (cellValue(row, key) != null) return;
+          const suggested = suggestionFor(row, key);
+          if (suggested == null) return;
+          arming = true;
+          input.value = formatEditable(suggested);
+          input.dataset.pending = "1";
+          input.classList.add("is-suggestion");
+          arming = false;
+          requestAnimationFrame(() => input.select());
+        });
+
+        input.addEventListener("mousedown", (event) => {
+          if (document.activeElement !== input || input.dataset.pending !== "1") return;
+          event.preventDefault();
+          commitCell(parseNumber(input.value));
+        });
+
+        input.addEventListener("input", () => {
+          if (arming) return;
+          const wasPending = input.dataset.pending === "1";
+          delete input.dataset.pending;
+          input.classList.remove("is-suggestion");
+          if (wasPending && input.value.trim() === "") input.dataset.keepEmpty = "1";
+          else delete input.dataset.keepEmpty;
+        });
+
+        input.addEventListener("blur", () => {
+          if (input.dataset.pending === "1") {
+            input.value = "";
+            delete input.dataset.pending;
+            input.classList.remove("is-suggestion");
+            return;
+          }
+          const parsed = parseNumber(input.value);
+          if (parsed === cellValue(row, key)) {
+            input.value = parsed == null ? "" : formatEditable(parsed);
+            return;
+          }
+          commitCell(parsed);
         });
       });
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
@@ -1436,4 +1544,5 @@
 
   watchForUpdate();
   boot();
+  window.__budget = { get state() { return state; }, suggestionFor, cellValue, previousExpenseMonth };
 })();
