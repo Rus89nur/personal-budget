@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.3.9";
+  const APP_VERSION = "1.4.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -17,6 +17,12 @@
   const MONTH_GENITIVE = [
     "января", "февраля", "марта", "апреля", "мая", "июня",
     "июля", "августа", "сентября", "октября", "ноября", "декабря",
+  ];
+
+  const RENT_LINE_PRESETS = [
+    { id: "rent_gaz", label: "Аренда Газовиков" },
+    { id: "rent_quiet", label: "Аренда Тихий" },
+    { id: "rent_garage", label: "Аренда гараж" },
   ];
 
   const els = {
@@ -58,11 +64,16 @@
     netAmount: document.getElementById("netAmount"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
     btnSettingsSave: document.getElementById("btnSettingsSave"),
+    rentDialog: document.getElementById("rentDialog"),
+    rentList: document.getElementById("rentList"),
+    rentSum: document.getElementById("rentSum"),
+    rentAdd: document.getElementById("rentAdd"),
   };
 
   let seedTemplate = null;
   let state = null;
   let settingsDraftOklad = null;
+  let rentMenuKey = null;
 
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -87,7 +98,13 @@
         { id: uid("inc"), label: "ЗП", amount: 0 },
         { id: uid("inc"), label: "Аванс", amount: 0 },
         { id: uid("inc"), label: "КВ", amount: 0 },
-        { id: uid("inc"), label: "Брокер", amount: 0 },
+        {
+          id: uid("inc"),
+          kind: "rent",
+          label: "Аренда",
+          amount: 0,
+          lines: freshRentLines(),
+        },
       ],
       expenses: [
         { id: uid("exp"), name: "Отложить", plan: 0, fact: null },
@@ -117,11 +134,7 @@
           worked: src.workdays?.worked ?? null,
           vacation: src.workdays?.vacation ?? null,
         },
-        income: (src.income || []).map((row) => ({
-          id: row.id || uid("inc"),
-          label: String(row.label || "Прочее"),
-          amount: Number(row.amount) || 0,
-        })),
+        income: (src.income || []).map(copyIncomeRow),
         expenses: (src.expenses || [])
           .filter((row) => row && row.name && String(row.name).toLowerCase() !== "остаток")
           .map((row) => ({
@@ -294,6 +307,7 @@
       savedAt: new Date().toISOString(),
     };
     attachYear(next, year);
+    ensureRentStructure(next);
     return next;
   }
 
@@ -351,6 +365,273 @@
 
   function isPayrollLabel(label) {
     return isSalaryLabel(label) || isAdvanceLabel(label) || isVacationLabel(label);
+  }
+
+  function freshRentLines() {
+    return RENT_LINE_PRESETS.map((item) => ({
+      id: item.id,
+      label: item.label,
+      amount: 0,
+      active: true,
+    }));
+  }
+
+  function normalizeRentLine(line) {
+    const amount = Number(line?.amount);
+    return {
+      id: String(line?.id || uid("rent")),
+      label: String(line?.label || "Аренда").trim() || "Аренда",
+      amount: Number.isFinite(amount) ? amount : 0,
+      active: line?.active !== false,
+    };
+  }
+
+  function cloneRentLines(lines) {
+    return (lines || []).map(normalizeRentLine);
+  }
+
+  function isRentRow(row) {
+    return row?.kind === "rent" || /^аренда$/i.test(String(row?.label || "").trim());
+  }
+
+  function copyIncomeRow(row) {
+    const copy = {
+      id: row.id || uid("inc"),
+      label: String(row.label || "Прочее"),
+      amount: Number(row.amount) || 0,
+    };
+    if (row.manual) copy.manual = true;
+    if (isRentRow(row)) {
+      copy.kind = "rent";
+      copy.label = "Аренда";
+      if (Array.isArray(row.lines)) copy.lines = cloneRentLines(row.lines);
+    }
+    return copy;
+  }
+
+  function rentTotal(lines) {
+    return (lines || []).reduce((sum, line) => {
+      if (line.active === false) return sum;
+      return sum + (Number(line.amount) || 0);
+    }, 0);
+  }
+
+  function syncRentRow(row) {
+    row.kind = "rent";
+    row.label = "Аренда";
+    row.amount = rentTotal(row.lines);
+    return row;
+  }
+
+  function rentCaption(row) {
+    const lines = row?.lines || [];
+    if (!lines.length) return "добавить";
+    const active = lines.filter((line) => line.active !== false).length;
+    return `${active} из ${lines.length}`;
+  }
+
+  function placeRentRow(month, row) {
+    const kv = month.income.findIndex((item) => /^кв$/i.test(String(item.label || "").trim()));
+    if (kv >= 0) {
+      month.income.splice(kv + 1, 0, row);
+      return;
+    }
+    const at = month.income.findIndex((item) => !isPayrollLabel(item.label));
+    if (at < 0) month.income.push(row);
+    else month.income.splice(at, 0, row);
+  }
+
+  function ensureRentRow(month, defaults) {
+    const template = defaults && defaults.length ? defaults : freshRentLines();
+    let row = month.income.find(isRentRow);
+    if (!row) {
+      row = {
+        id: uid("inc"),
+        kind: "rent",
+        label: "Аренда",
+        amount: 0,
+        lines: cloneRentLines(template),
+      };
+      placeRentRow(month, row);
+      return syncRentRow(row);
+    }
+    row.kind = "rent";
+    if (!Array.isArray(row.lines)) {
+      row.lines = cloneRentLines(template);
+      const carried = Number(row.amount) || 0;
+      if (carried && carried !== rentTotal(row.lines) && row.lines[0]) {
+        row.lines[0].amount = carried;
+        row.lines[0].active = true;
+      }
+    } else {
+      row.lines = cloneRentLines(row.lines);
+    }
+    return syncRentRow(row);
+  }
+
+  function ensureRentStructure(target) {
+    let changed = false;
+    if (!Array.isArray(target.rentDefaults)) {
+      target.rentDefaults = freshRentLines();
+      changed = true;
+    } else {
+      const normalized = cloneRentLines(target.rentDefaults);
+      if (JSON.stringify(normalized) !== JSON.stringify(target.rentDefaults)) changed = true;
+      target.rentDefaults = normalized;
+    }
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key) => {
+        const month = target.years?.[year]?.months?.[key];
+        if (!month) return;
+        const existing = month.income.find(isRentRow);
+        const before = existing ? JSON.stringify(existing.lines ?? null) : null;
+        ensureRentRow(month, target.rentDefaults);
+        const row = month.income.find(isRentRow);
+        if (before !== JSON.stringify(row.lines)) changed = true;
+      });
+    });
+    return changed;
+  }
+
+  function monthSerial(key) {
+    return yearOf(key) * 12 + monthIndex(key);
+  }
+
+  function monthByKey(key) {
+    return state.years?.[yearOf(key)]?.months?.[key] || null;
+  }
+
+  function forMonthsFrom(fromKey, fn) {
+    const start = monthSerial(fromKey);
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key) => {
+        if (monthSerial(key) < start) return;
+        const month = state.years?.[year]?.months?.[key];
+        if (month) fn(month, key);
+      });
+    });
+  }
+
+  function rememberRentLine(line) {
+    const normalized = normalizeRentLine(line);
+    const found = state.rentDefaults.find((item) => item.id === normalized.id);
+    if (found) {
+      found.label = normalized.label;
+      found.amount = normalized.amount;
+      found.active = normalized.active;
+      return;
+    }
+    state.rentDefaults.push(normalized);
+  }
+
+  function paintRentRow() {
+    const row = activeMonth()?.income?.find(isRentRow);
+    if (!row) return;
+    const amount = document.querySelector("#incomeBody [data-rent-amount]");
+    if (amount) amount.value = formatEditable(row.amount);
+    const meta = document.querySelector("#incomeBody [data-rent-meta]");
+    if (meta) meta.textContent = rentCaption(row);
+    refreshTotalsOnly();
+  }
+
+  function patchRentLine(fromKey, lineId, patch) {
+    forMonthsFrom(fromKey, (month) => {
+      const row = ensureRentRow(month, state.rentDefaults);
+      let line = row.lines.find((item) => item.id === lineId);
+      if (!line) {
+        line = normalizeRentLine({ id: lineId, label: "Аренда", amount: 0, active: true });
+        row.lines.push(line);
+      }
+      if (patch.label != null) line.label = String(patch.label).trim() || "Аренда";
+      if (patch.amount != null) line.amount = Number(patch.amount) || 0;
+      if (patch.active != null) line.active = Boolean(patch.active);
+      syncRentRow(row);
+    });
+    const source = monthByKey(fromKey);
+    const line = source && source.income.find(isRentRow)?.lines.find((item) => item.id === lineId);
+    if (line) rememberRentLine(line);
+    state.seeded = false;
+    saveState();
+    paintRentRow();
+    if (els.rentDialog.open) renderRentMenu();
+  }
+
+  function addRentLine(fromKey) {
+    const line = normalizeRentLine({
+      id: uid("rent"),
+      label: "Новая аренда",
+      amount: 0,
+      active: true,
+    });
+    forMonthsFrom(fromKey, (month) => {
+      const row = ensureRentRow(month, state.rentDefaults);
+      row.lines.push(normalizeRentLine(line));
+      syncRentRow(row);
+    });
+    rememberRentLine(line);
+    state.seeded = false;
+    saveState();
+    paintRentRow();
+    renderRentMenu();
+    const names = els.rentList.querySelectorAll(".name-input");
+    names[names.length - 1]?.focus();
+    names[names.length - 1]?.select();
+  }
+
+  function removeRentLine(fromKey, lineId) {
+    forMonthsFrom(fromKey, (month) => {
+      const row = month.income.find(isRentRow);
+      if (!row?.lines) return;
+      row.lines = row.lines.filter((item) => item.id !== lineId);
+      syncRentRow(row);
+    });
+    state.rentDefaults = state.rentDefaults.filter((item) => item.id !== lineId);
+    state.seeded = false;
+    saveState();
+    paintRentRow();
+    renderRentMenu();
+  }
+
+  function renderRentMenu() {
+    const key = rentMenuKey || state.currentMonth;
+    const month = monthByKey(key);
+    if (!month) return;
+    const row = ensureRentRow(month, state.rentDefaults);
+    els.rentList.innerHTML = "";
+    row.lines.forEach((line) => {
+      const item = document.createElement("div");
+      item.className = `rent-line${line.active ? "" : " is-off"}`;
+      item.innerHTML = `
+        <input type="checkbox" aria-label="Учитывать в доходе" ${line.active ? "checked" : ""} />
+        <input class="name-input" type="text" value="${escapeAttr(line.label)}" aria-label="Название" />
+        <input class="num-input" type="text" inputmode="decimal" value="${formatEditable(line.amount)}" aria-label="Сумма" />
+        <button type="button" class="icon-x" aria-label="Удалить строку">×</button>
+      `;
+      const [check, name, amount, remove] = item.children;
+      check.addEventListener("change", () => patchRentLine(key, line.id, { active: check.checked }));
+      name.addEventListener("change", () => patchRentLine(key, line.id, { label: name.value }));
+      amount.addEventListener("change", () => patchRentLine(key, line.id, { amount: parseNumber(amount.value) || 0 }));
+      remove.addEventListener("click", () => removeRentLine(key, line.id));
+      els.rentList.appendChild(item);
+    });
+    els.rentSum.textContent = money(rentTotal(row.lines));
+  }
+
+  function openRentMenu() {
+    rentMenuKey = state.currentMonth;
+    renderRentMenu();
+    if (typeof els.rentDialog.showModal === "function") {
+      if (!els.rentDialog.open) els.rentDialog.showModal();
+    } else {
+      els.rentDialog.setAttribute("open", "");
+    }
+    els.rentList.querySelector(".num-input")?.focus();
+  }
+
+  function closeRentMenu() {
+    rentMenuKey = null;
+    if (typeof els.rentDialog.close === "function" && els.rentDialog.open) els.rentDialog.close();
+    else els.rentDialog.removeAttribute("open");
   }
 
   function dedupePayrollRows(month) {
@@ -748,10 +1029,28 @@
     month.income.forEach((row, index) => {
       const payroll = isPayrollLabel(row.label);
       const tr = document.createElement("tr");
+      const rent = isRentRow(row);
       if (payroll) tr.classList.add("payroll-derived");
+      if (rent) tr.classList.add("rent-row");
       if (animateRows) {
         tr.classList.add("row-in");
         tr.style.animationDelay = `${Math.min(index, 8) * 0.045}s`;
+      }
+      if (rent) {
+        tr.innerHTML = `
+          <td>
+            <button type="button" class="rent-open" data-act="rent">
+              <span>Аренда</span>
+              <small data-rent-meta>${escapeAttr(rentCaption(row))}</small>
+            </button>
+          </td>
+          <td class="num"><input class="num-input" type="text" readonly value="${formatEditable(row.amount)}" data-rent-amount title="Состав аренды" /></td>
+          <td class="actions-col"></td>
+        `;
+        tr.querySelector("[data-act=rent]").addEventListener("click", openRentMenu);
+        tr.querySelector("[data-rent-amount]").addEventListener("click", openRentMenu);
+        els.incomeBody.appendChild(tr);
+        return;
       }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payroll ? "readonly" : ""} /></td>
@@ -902,6 +1201,7 @@
   }
 
   function render() {
+    if (els.rentDialog?.open && rentMenuKey && rentMenuKey !== state.currentMonth) closeRentMenu();
     const month = activeMonth();
     const key = `${state.year}|${state.currentMonth}`;
     const switched = paintedKey != null && paintedKey !== key;
@@ -948,6 +1248,7 @@
       exportedAt: new Date().toISOString(),
       oklad: state.oklad,
       dailyAverage: state.dailyAverage,
+      rentDefaults: state.rentDefaults,
       months: state.months,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -971,6 +1272,7 @@
         if (Number.isFinite(Number(data.oklad)) && Number(data.oklad) > 0) {
           next.oklad = Number(data.oklad);
         }
+        if (Array.isArray(data.rentDefaults)) next.rentDefaults = cloneRentLines(data.rentDefaults);
         for (const key of monthKeys()) {
           if (months[key]) {
             const src = months[key];
@@ -980,11 +1282,7 @@
                 worked: src.workdays?.worked ?? null,
                 vacation: src.workdays?.vacation ?? null,
               },
-              income: (src.income || []).map((row) => ({
-                id: row.id || uid("inc"),
-                label: String(row.label || "Прочее"),
-                amount: Number(row.amount) || 0,
-              })),
+              income: (src.income || []).map(copyIncomeRow),
               expenses: (src.expenses || []).map((row) => ({
                 id: row.id || uid("exp"),
                 name: String(row.name || "Прочее"),
@@ -994,6 +1292,7 @@
             };
           }
         }
+        ensureRentStructure(next);
         if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
         state = next;
         saveState();
@@ -1048,6 +1347,15 @@
   els.settingsDialog.addEventListener("cancel", (e) => {
     e.preventDefault();
     closeSettings();
+  });
+  document.getElementById("rentDialogClose").addEventListener("click", closeRentMenu);
+  els.rentAdd.addEventListener("click", () => addRentLine(rentMenuKey || state.currentMonth));
+  els.rentDialog.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeRentMenu();
+  });
+  els.rentDialog.addEventListener("click", (e) => {
+    if (e.target === els.rentDialog) closeRentMenu();
   });
   els.importFile.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1104,7 +1412,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation) saveState();
+    if (droppedVacation || ensureRentStructure(state)) saveState();
     render();
   }
 

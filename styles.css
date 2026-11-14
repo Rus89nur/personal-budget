@@ -873,6 +873,84 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   cursor: default;
 }
 
+.rent-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  color: var(--ink);
+  background: rgba(29, 107, 69, 0.08);
+  cursor: pointer;
+}
+
+.rent-open small {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.rent-row .num-input[readonly] {
+  cursor: pointer;
+  background: rgba(29, 107, 69, 0.08);
+}
+
+.rent-dialog {
+  max-width: min(480px, calc(100vw - 1.5rem));
+}
+
+.rent-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 6.4rem auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.rent-line input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
+.rent-line .name-input,
+.rent-line .num-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-strong);
+}
+
+.rent-line .num-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rent-line.is-off .name-input,
+.rent-line.is-off .num-input {
+  color: var(--muted);
+}
+
+.rent-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 650;
+}
+
 .site-foot {
   position: relative;
   z-index: 3;
