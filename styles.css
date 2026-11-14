@@ -564,6 +564,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   line-height: 1;
 }
 
+.year-nav .month-chip.year-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.year-nav .month-chip.year-add:disabled:hover {
+  transform: none;
+}
+
 .work-total {
   font-size: 1.35rem;
   font-variant-numeric: tabular-nums;
@@ -1321,16 +1330,16 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   position: static;
   display: block;
   transform: none;
-  margin-top: 0;
+  margin-top: 0.12rem;
   padding: 0;
   border-radius: 0;
   background: transparent;
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 500;
+  line-height: 1.3;
   text-align: center;
-  max-height: 0;
-  overflow: hidden;
+  min-height: 1.3em;
 }
 
 .rent-row:hover .rent-hint,
@@ -1341,8 +1350,6 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 .set-aside-row:hover .set-aside-hint,
 .set-aside-row:focus-within .set-aside-hint {
   opacity: 1;
-  max-height: 1.5rem;
-  margin-top: 0.12rem;
 }
 
 @media (hover: none) {

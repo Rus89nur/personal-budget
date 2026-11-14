@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.12.4";
+  const APP_VERSION = "1.13.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -398,6 +398,61 @@
     const next = Math.max(...YEARS) + 1;
     ensureYearData(state, next);
     applySalaryToMonths(state, { silent: true });
+    saveState();
+    render();
+  }
+
+  function dropMonthKeys(map, year) {
+    if (!map) return;
+    const prefix = `${year}-`;
+    Object.keys(map).forEach((key) => {
+      if (String(key).startsWith(prefix)) delete map[key];
+    });
+  }
+
+  function yearHasEnteredData(year) {
+    const months = state.years?.[year]?.months || {};
+    const monthFilled = Object.values(months).some((month) => {
+      const days = month?.workdays || {};
+      if (days.partialChosen || days.vacationOn || days.dailyManual) return true;
+      const incomeFilled = (month?.income || []).some((row) => {
+        if (row.kind === "rent") return (row.lines || []).some((line) => Number(line.amount));
+        if (row.manual && Number(row.amount)) return true;
+        const payroll = isSalaryLabel(row.label) || isAdvanceLabel(row.label) || isVacationLabel(row.label);
+        return !payroll && Number(row.amount);
+      });
+      if (incomeFilled) return true;
+      return (month?.expenses || []).some((row) => {
+        normalizeExpense(row);
+        if (row.planManual && Number(row.plan)) return true;
+        if (row.fact != null && row.fact !== "" && Number(row.fact)) return true;
+        return Object.entries(row.sharesManual || {}).some(([key, on]) => on && Number(row.shares?.[key]));
+      });
+    });
+    if (monthFilled) return true;
+    const prefix = `${year}-`;
+    const hasKeyed = (amounts) => Object.entries(amounts || {}).some(([key, value]) => String(key).startsWith(prefix) && value != null && value !== "" && Number(value) !== 0);
+    if (Object.values(state.savingsFact?.rows || {}).some(hasKeyed)) return true;
+    if ((state.savingsFact?.brokerIncomes || []).some((row) => hasKeyed(row.amounts))) return true;
+    return Object.values(state.utilities?.rows || {}).some(hasKeyed);
+  }
+
+  function removeFarthestYear() {
+    if (YEARS.length < 2) return;
+    const year = Math.max(...YEARS);
+    const filled = yearHasEnteredData(year);
+    const message = filled
+      ? `Удалить ${year}? В этом году есть введённые данные, они пропадут.`
+      : `Удалить ${year}? В этом году нет введённых данных.`;
+    if (!confirm(message)) return;
+    delete state.years[year];
+    const index = YEARS.indexOf(year);
+    if (index >= 0) YEARS.splice(index, 1);
+    Object.values(state.savingsFact?.rows || {}).forEach((amounts) => dropMonthKeys(amounts, year));
+    (state.savingsFact?.brokerIncomes || []).forEach((row) => dropMonthKeys(row.amounts, year));
+    Object.values(state.utilities?.rows || {}).forEach((amounts) => dropMonthKeys(amounts, year));
+    if (state.year === year) attachYear(state, Math.max(...YEARS));
+    if (analyticsYear === year) analyticsYear = state.year;
     saveState();
     render();
   }
@@ -1261,6 +1316,14 @@
       });
       els.yearNav.appendChild(btn);
     });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "month-chip year-add";
+    remove.textContent = "−";
+    remove.setAttribute("aria-label", "Удалить самый дальний год");
+    remove.disabled = YEARS.length < 2;
+    remove.addEventListener("click", () => removeFarthestYear());
+    els.yearNav.appendChild(remove);
     const add = document.createElement("button");
     add.type = "button";
     add.className = "month-chip year-add";
@@ -2219,6 +2282,7 @@
 
   let analyticsYear = null;
   let analyticsMonth = null;
+  let analyticsYearBars = false;
 
   function yearMonth(year, index) {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
@@ -2368,6 +2432,48 @@
     return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}${baseline}${ticks}</svg>`;
   }
 
+  function yearBarChart(labels, series, markIndex) {
+    const width = 720;
+    const labelW = 48;
+    const padRight = 12;
+    const padTop = 6;
+    const axisH = 22;
+    const rowH = series.length > 1 ? 38 : 28;
+    const height = padTop + labels.length * rowH + axisH;
+    const plotW = width - labelW - padRight;
+    const rawMax = Math.max(0, ...series.flatMap((item) => item.values.map((n) => Number(n) || 0)));
+    const axis = chartAxis(rawMax);
+    const barGap = 3;
+    const barH = Math.min(11, (rowH - 12) / series.length);
+    const rows = labels.map((label, index) => {
+      const y = padTop + index * rowH;
+      const band = index === markIndex
+        ? `<rect x="${labelW - 6}" y="${(y + 1).toFixed(1)}" width="${plotW + 10}" height="${rowH - 2}" rx="8" fill="rgba(28,27,25,0.05)" />`
+        : "";
+      const bars = series.map((item, seriesIndex) => {
+        const value = Number(item.values[index]) || 0;
+        const barW = (plotW * value) / axis.top;
+        const offset = (rowH - series.length * barH - (series.length - 1) * barGap) / 2;
+        const barY = y + offset + seriesIndex * (barH + barGap);
+        return `<rect x="${labelW}" y="${barY.toFixed(1)}" width="${(value > 0 ? Math.max(barW, 1.5) : 0).toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${item.color}" />`;
+      }).join("");
+      const tip = chartTipPayload(label, series.map((item) => ({
+        name: item.name,
+        value: Number(item.values[index]) || 0,
+        color: item.color,
+      })));
+      return `${band}<text x="0" y="${(y + rowH / 2 + 4).toFixed(1)}" fill="#3f3c37" font-size="12">${escapeAttr(label)}</text>${bars}<rect class="chart-hit" x="0" y="${y}" width="${width}" height="${rowH}" fill="transparent" data-chart-tip="${tip}" />`;
+    }).join("");
+    const ticks = axis.ticks.map((tick) => {
+      const x = labelW + (plotW * tick) / axis.top;
+      const anchor = tick === 0 ? "start" : tick === axis.top ? "end" : "middle";
+      return `<line x1="${x.toFixed(1)}" y1="${height - axisH}" x2="${x.toFixed(1)}" y2="${height - axisH + 4}" stroke="rgba(28,27,25,0.28)" />
+        <text x="${x.toFixed(1)}" y="${height - 4}" text-anchor="${anchor}" fill="#6d6962" font-size="11">${escapeAttr(axisMoney(tick))}</text>`;
+    }).join("");
+    const baseline = `<line x1="${labelW}" y1="${height - axisH}" x2="${labelW + plotW}" y2="${height - axisH}" stroke="rgba(28,27,25,0.18)" />`;
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Линейчатый график">${rows}${baseline}${ticks}</svg>`;
+  }
+
   function paintChartTip(data) {
     els.chartTip.replaceChildren();
     const title = document.createElement("strong");
@@ -2451,7 +2557,11 @@
       btn.textContent = name;
       btn.setAttribute("aria-pressed", index === analyticsMonth ? "true" : "false");
       btn.addEventListener("click", () => {
-        analyticsMonth = index;
+        if (analyticsMonth === index) analyticsYearBars = !analyticsYearBars;
+        else {
+          analyticsMonth = index;
+          analyticsYearBars = false;
+        }
         renderAnalytics();
       });
       els.analyticsMonth.appendChild(btn);
@@ -2475,6 +2585,10 @@
     const utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
     const monthName = MONTHS_RU[selectedMonth] || "";
     const parts = monthParts(year, selectedMonth);
+    const drawYear = analyticsYearBars ? yearBarChart : columnChart;
+    const viewNote = analyticsYearBars
+      ? "Линейчатый график за год. Ещё раз по выбранному месяцу — столбцы."
+      : "Ещё раз по выбранному месяцу — линейчатый график за год.";
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2490,21 +2604,21 @@
     els.analyticsCharts.innerHTML = `
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
-        <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}</p>
-        ${columnChart(MONTHS_SHORT, flow, selectedMonth)}
+        <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}. ${viewNote}</p>
+        ${drawYear(MONTHS_SHORT, flow, selectedMonth)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(saved)))}</p>
-        ${columnChart(MONTHS_SHORT, savedSeries, selectedMonth)}
+        ${drawYear(MONTHS_SHORT, savedSeries, selectedMonth)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
         <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(utilities)))}</p>
-        ${columnChart(MONTHS_SHORT, utilitySeries, selectedMonth)}
+        ${drawYear(MONTHS_SHORT, utilitySeries, selectedMonth)}
         ${chartLegend(utilitySeries)}
       </article>
     `;
