@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.4.9";
+  const APP_VERSION = "1.5.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -106,6 +106,7 @@
         },
       ],
       expenses: [
+        { id: uid("exp"), name: "10%", plan: null, shares: {}, sharesManual: {} },
         { id: uid("exp"), name: "Отложить", plan: 0, fact: null },
         { id: uid("exp"), name: "Жили были", plan: 0, fact: null },
         { id: uid("exp"), name: "Ипотека", plan: 0, fact: null },
@@ -227,7 +228,50 @@
     return state.years[year]?.months[`${year}-${String(index).padStart(2, "0")}`] || null;
   }
 
+  function isTitheRow(row) {
+    return String(row?.name || "").trim() === "10%";
+  }
+
+  function titheSuggestion(key) {
+    const month = activeMonth();
+    if (!month) return null;
+    const base = key === "plan"
+      ? month.income.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+      : (incomeColumns(month).find((col) => col.key === key)?.amount || 0);
+    const value = Math.round(base * 0.1);
+    return value > 0 ? value : null;
+  }
+
+  function ensureTitheRow(month) {
+    if (!month?.expenses) return false;
+    let changed = false;
+    let row = month.expenses.find(isTitheRow);
+    if (!row) {
+      row = { id: uid("exp"), name: "10%", plan: null, shares: {}, sharesManual: {} };
+      month.expenses.unshift(row);
+      return true;
+    }
+    const index = month.expenses.indexOf(row);
+    if (index > 0) {
+      month.expenses.splice(index, 1);
+      month.expenses.unshift(row);
+      changed = true;
+    }
+    return changed;
+  }
+
+  function ensureTitheStructure(target) {
+    let changed = false;
+    YEARS.forEach((year) => {
+      Object.values(target.years?.[year]?.months || {}).forEach((month) => {
+        if (ensureTitheRow(month)) changed = true;
+      });
+    });
+    return changed;
+  }
+
   function suggestionFor(row, key) {
+    if (isTitheRow(row)) return titheSuggestion(key);
     const prev = previousExpenseMonth();
     if (!prev) return null;
     const src = prev.expenses.find(
@@ -328,6 +372,7 @@
     attachYear(next, year);
     ensureRentStructure(next);
     dropKvFromDecember(next);
+    ensureTitheStructure(next);
     return next;
   }
 
@@ -1459,6 +1504,7 @@
         }
         ensureRentStructure(next);
         dropKvFromDecember(next);
+        ensureTitheStructure(next);
         if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
         state = next;
         saveState();
@@ -1578,7 +1624,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state)) saveState();
     render();
   }
 
