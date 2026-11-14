@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.19.1";
+  const APP_VERSION = "1.20.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
