@@ -212,6 +212,7 @@ body:has(#navToggle:checked) .nav-action {
 
 body:has(#navToggle:checked) .nav-action:nth-child(2) { animation-delay: 0.06s; }
 body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; }
+body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; }
 
 .nav-action:hover { opacity: 0.65; }
 
@@ -769,6 +770,16 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   gap: 0.45rem;
 }
 
+.subtable {
+  margin-top: 1.5rem;
+}
+
+.subtable h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
 .work-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -987,7 +998,10 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: linear-gradient(to bottom, transparent, rgba(28, 27, 25, 0.2));
 }
 
-.expense-panel tfoot .plan-col::after {
+.expense-panel tfoot .plan-col::after,
+.savings-table tbody tr:last-child .plan-col::after,
+#brokerIncomeTable tbody tr:last-child .plan-col::after,
+.utilities-table tbody tr:last-child .plan-col::after {
   bottom: 0.15rem;
   background: linear-gradient(to bottom, rgba(28, 27, 25, 0.2), transparent);
 }
@@ -1075,6 +1089,94 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   margin-top: 0.12rem;
   color: var(--muted);
   font-size: 0.82em;
+}
+
+.analytics-panel {
+  scroll-margin-top: 5.5rem;
+}
+
+.analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-filters label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 10rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.analytics-filters select {
+  min-height: var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  padding: 0 0.75rem;
+}
+
+.chart-card {
+  margin-top: 0.85rem;
+}
+
+.chart-card h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.chart-card .chart-note {
+  margin: 0.2rem 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 0.45rem;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.chart-legend i {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-split {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.chart-empty {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (min-width: 860px) {
+  .chart-split {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .icon-x {

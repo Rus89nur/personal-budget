@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.9.4";
+  const APP_VERSION = "1.10.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -79,8 +79,14 @@
     rentAdd: document.getElementById("rentAdd"),
     savingsHead: document.getElementById("savingsHead"),
     savingsBody: document.getElementById("savingsBody"),
+    brokerIncomeHead: document.getElementById("brokerIncomeHead"),
+    brokerIncomeBody: document.getElementById("brokerIncomeBody"),
+    btnAddBrokerIncome: document.getElementById("btnAddBrokerIncome"),
     utilitiesHead: document.getElementById("utilitiesHead"),
     utilitiesBody: document.getElementById("utilitiesBody"),
+    analyticsYear: document.getElementById("analyticsYear"),
+    analyticsMonth: document.getElementById("analyticsMonth"),
+    analyticsCharts: document.getElementById("analyticsCharts"),
   };
 
   let seedTemplate = null;
@@ -1727,7 +1733,7 @@
 
   const SAVINGS_ROWS = [
     { id: "deposit", name: "Вклад" },
-    { id: "broker", name: "Брокерский счет" },
+    { id: "broker", name: "Брокерский счет", calc: "broker" },
     { id: "iis", name: "ИИС" },
     { id: "iis3", name: "ИИС 3" },
     { id: "flat1", name: "Квартира 1" },
@@ -1743,6 +1749,21 @@
 
   const SAVINGS_EARNED = ["deposit", "broker", "iis", "iis3", "flat1", "flat2", "garage"];
 
+  function defaultBrokerIncomes() {
+    const line = (id, name, amounts) => ({ id, name, amounts });
+    return [
+      line("brk-brus", "Брусника", { "2025-08": 313, "2025-11": 0, "2025-12": 5831, "2026-05": 10920.8, "2026-06": 10920.8, "2026-07": 10920, "2026-08": 10920, "2026-09": 11220, "2026-10": 11220 }),
+      line("brk-vis", "Вис финанас", { "2025-08": 200, "2025-11": 2794, "2025-12": 2989, "2026-01": 2207, "2026-03": 2207, "2026-04": 2207 }),
+      line("brk-sel", "Селектел", { "2025-08": 200, "2025-11": 2532, "2025-12": 2532 }),
+      line("brk-selig", "Селигдар", { "2025-08": 200, "2025-11": 3042, "2025-12": 3254, "2026-01": 3254, "2026-02": 3254, "2026-03": 3254, "2026-04": 3254 }),
+      line("brk-parus", "парус", { "2026-02": 915, "2026-03": 916.04, "2026-04": 992.74, "2026-05": 153.47, "2026-06": 673, "2026-07": 673, "2026-08": 673, "2026-09": 674.3, "2026-10": 674.3 }),
+      line("brk-post", "Почта", { "2026-05": 7571.7, "2026-06": 8262, "2026-07": 8262, "2026-08": 8262, "2026-09": 8319, "2026-10": 8319 }),
+      line("brk-ofz", "ОФЗ", { "2026-05": 13559.76, "2026-06": 16980, "2026-07": 14388, "2026-08": 13611, "2026-09": 18961, "2026-10": 28470.4 }),
+      line("brk-div", "Дивы", { "2026-07": 3260, "2026-08": 8657, "2026-09": 770, "2026-10": 7623 }),
+      line("brk-rest", "Прочее", { "2025-08": 17087 }),
+    ];
+  }
+
   function defaultSavingsFact() {
     return {
       rows: {
@@ -1757,13 +1778,21 @@
         capitalPlan: { "2025-08": 997662, "2025-09": 997662, "2025-10": 2989305, "2025-11": 3063284, "2025-12": 3143830, "2026-01": 3109070, "2026-02": 3341072, "2026-04": 3694388, "2026-05": 3910882.73, "2026-06": 3518867.8, "2026-07": 3622970.8, "2026-08": 3928602.8, "2026-09": 4099182.1, "2026-10": 4313655.8, "2026-11": 4350123.8, "2026-12": 4410123.8 },
         capitalFact: { "2025-12": 2952469, "2026-03": 3525388, "2026-05": 3308284 },
       },
+      brokerIncomes: defaultBrokerIncomes(),
     };
   }
 
   function ensureSavingsFact(target) {
-    if (target.savingsFact?.rows) return false;
-    target.savingsFact = defaultSavingsFact();
-    return true;
+    let changed = false;
+    if (!target.savingsFact?.rows) {
+      target.savingsFact = defaultSavingsFact();
+      return true;
+    }
+    if (!Array.isArray(target.savingsFact.brokerIncomes)) {
+      target.savingsFact.brokerIncomes = defaultBrokerIncomes();
+      changed = true;
+    }
+    return changed;
   }
 
   function savingsStored(id, key) {
@@ -1777,8 +1806,22 @@
     return Math.round(n * 100) / 100;
   }
 
+  function brokerIncomeSum(key) {
+    const rows = state.savingsFact?.brokerIncomes || [];
+    const parts = [];
+    rows.forEach((row) => {
+      const value = row.amounts?.[key];
+      if (value == null || value === "") return;
+      const n = Number(value);
+      if (Number.isFinite(n)) parts.push(n);
+    });
+    if (!parts.length) return null;
+    return savingsRound(parts.reduce((sum, value) => sum + value, 0));
+  }
+
   function savingsEarned(key) {
-    const parts = SAVINGS_EARNED.map((id) => savingsStored(id, key)).filter((value) => value != null);
+    const parts = SAVINGS_EARNED.map((id) => (id === "broker" ? brokerIncomeSum(key) : savingsStored(id, key)))
+      .filter((value) => value != null);
     if (!parts.length) return null;
     return savingsRound(parts.reduce((sum, value) => sum + value, 0));
   }
@@ -1799,6 +1842,7 @@
 
   function savingsCalc(kind, key) {
     if (kind === "earned") return savingsEarned(key);
+    if (kind === "broker") return brokerIncomeSum(key);
     if (kind === "topup") return savingsTopup(key);
     return savingsDelta(key);
   }
@@ -1882,6 +1926,56 @@
         });
       });
       els.savingsBody.appendChild(tr);
+    });
+    renderBrokerIncomes(months);
+  }
+
+  function renderBrokerIncomes(months) {
+    if (!els.brokerIncomeHead || !els.brokerIncomeBody || !state.savingsFact) return;
+    const rows = state.savingsFact.brokerIncomes || [];
+    els.brokerIncomeHead.innerHTML = `
+      <tr>
+        <th><span class="col-title">Доход</span></th>
+        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
+        <th class="actions-col"></th>
+      </tr>
+    `;
+    els.brokerIncomeBody.innerHTML = "";
+    rows.forEach((row) => {
+      if (!row.amounts) row.amounts = {};
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
+        ${months.map((month, index) => {
+          const value = row.amounts[month.key];
+          const shown = value == null || value === "" ? "" : formatEditable(Number(value));
+          const cell = month.editable
+            ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
+            : readCell(shown);
+          return `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${cell}</td>`;
+        }).join("")}
+        <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
+      `;
+      tr.querySelector('[data-field="name"]').addEventListener("change", (event) => {
+        row.name = event.target.value.trim() || "Доход";
+        saveState();
+      });
+      tr.querySelectorAll("input[data-month]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const monthKey = input.dataset.month;
+          const parsed = parseNumber(input.value);
+          if (parsed == null) delete row.amounts[monthKey];
+          else row.amounts[monthKey] = parsed;
+          saveState();
+          renderSavings();
+        });
+      });
+      tr.querySelector('[data-act="del"]').addEventListener("click", () => {
+        state.savingsFact.brokerIncomes = rows.filter((item) => item.id !== row.id);
+        saveState();
+        renderSavings();
+      });
+      els.brokerIncomeBody.appendChild(tr);
     });
   }
 
@@ -2029,6 +2123,177 @@
     node.classList.toggle("delta-neg", value < 0);
   }
 
+  let analyticsReady = false;
+
+  function yearMonth(year, index) {
+    const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+    return state.years?.[year]?.months?.[key] || null;
+  }
+
+  function budgetSeries(year) {
+    const income = [];
+    const plan = [];
+    for (let index = 0; index < 12; index += 1) {
+      const month = yearMonth(year, index);
+      const totalsRow = month ? totals(month) : { income: 0, plan: 0 };
+      income.push(totalsRow.income);
+      plan.push(totalsRow.plan);
+    }
+    return { income, plan };
+  }
+
+  function monthParts(year, index) {
+    const month = yearMonth(year, index);
+    if (!month) return { income: [], expenses: [] };
+    const income = month.income
+      .map((row) => ({ label: String(row.label || "Прочее"), value: Number(row.amount) || 0 }))
+      .filter((row) => row.value > 0);
+    const expenses = (month.expenses || []).map((row) => {
+      normalizeExpense(row);
+      return { label: String(row.name || "Прочее"), value: cellValue(row, "plan") || 0 };
+    }).filter((row) => row.value > 0);
+    return { income, expenses };
+  }
+
+  function monthAmounts(year, read) {
+    return Array.from({ length: 12 }, (_, index) => {
+      const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+      return read(key) || 0;
+    });
+  }
+
+  function sumNumbers(values) {
+    return values.reduce((sum, value) => sum + (Number(value) || 0), 0);
+  }
+
+  function chartLegend(series) {
+    return `<div class="chart-legend">${series.map((item) => `<span><i style="background:${item.color}"></i>${escapeAttr(item.name)}</span>`).join("")}</div>`;
+  }
+
+  function columnChart(labels, series, markIndex) {
+    const width = 720;
+    const height = 236;
+    const padX = 6;
+    const padTop = 14;
+    const padBottom = 26;
+    const plotW = width - padX * 2;
+    const plotH = height - padTop - padBottom;
+    const max = Math.max(1, ...series.flatMap((item) => item.values));
+    const groupW = plotW / labels.length;
+    const inner = groupW * 0.74;
+    const barW = inner / series.length;
+    const bands = [];
+    const bars = [];
+    const captions = [];
+    labels.forEach((label, index) => {
+      const x0 = padX + index * groupW;
+      if (markIndex === index) {
+        bands.push(`<rect x="${(x0 + 1).toFixed(1)}" y="${padTop}" width="${(groupW - 2).toFixed(1)}" height="${plotH}" rx="8" fill="rgba(28,27,25,0.05)" />`);
+      }
+      series.forEach((item, seriesIndex) => {
+        const value = Number(item.values[index]) || 0;
+        const barH = (value / max) * (plotH - 6);
+        const x = x0 + (groupW - inner) / 2 + seriesIndex * barW;
+        const y = padTop + plotH - barH;
+        const fade = markIndex >= 0 && markIndex !== index ? 0.32 : 1;
+        bars.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW - 3, 2).toFixed(1)}" height="${(value > 0 ? Math.max(barH, 2) : 0).toFixed(1)}" rx="3" fill="${item.color}" opacity="${fade}"><title>${escapeAttr(label)} · ${escapeAttr(item.name)}: ${escapeAttr(money(value))}</title></rect>`);
+      });
+      captions.push(`<text x="${(x0 + groupW / 2).toFixed(1)}" y="${height - 7}" text-anchor="middle" fill="#6d6962" font-size="11">${escapeAttr(label)}</text>`);
+    });
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Столбчатый график">${bands.join("")}${bars.join("")}${captions.join("")}</svg>`;
+  }
+
+  function rowChart(items, color) {
+    if (!items.length) return `<p class="chart-empty">Нет сумм за этот месяц</p>`;
+    const width = 520;
+    const rowH = 28;
+    const height = items.length * rowH + 4;
+    const labelW = 138;
+    const max = Math.max(1, ...items.map((item) => item.value));
+    const rows = items.map((item, index) => {
+      const y = index * rowH;
+      const barW = ((width - labelW - 12) * item.value) / max;
+      const name = item.label.length > 16 ? `${item.label.slice(0, 15)}…` : item.label;
+      return `<text x="0" y="${y + 18}" fill="#3f3c37" font-size="12"><title>${escapeAttr(item.label)}: ${escapeAttr(money(item.value))}</title>${escapeAttr(name)}</text><rect x="${labelW}" y="${y + 6}" width="${Math.max(barW, 2).toFixed(1)}" height="14" rx="4" fill="${color}"><title>${escapeAttr(money(item.value))}</title></rect>`;
+    }).join("");
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img">${rows}</svg>`;
+  }
+
+  function bindAnalytics() {
+    if (analyticsReady || !els.analyticsYear || !els.analyticsMonth) return;
+    YEARS.forEach((year) => {
+      const option = document.createElement("option");
+      option.value = String(year);
+      option.textContent = String(year);
+      els.analyticsYear.appendChild(option);
+    });
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "Все месяцы";
+    els.analyticsMonth.appendChild(all);
+    MONTHS_RU.forEach((name, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = name;
+      els.analyticsMonth.appendChild(option);
+    });
+    els.analyticsYear.value = String(state.year);
+    els.analyticsYear.addEventListener("change", () => renderAnalytics());
+    els.analyticsMonth.addEventListener("change", () => renderAnalytics());
+    analyticsReady = true;
+  }
+
+  function renderAnalytics() {
+    if (!els.analyticsCharts || !state) return;
+    bindAnalytics();
+    const year = Number(els.analyticsYear.value) || state.year;
+    const monthIndex = els.analyticsMonth.value === "" ? -1 : Number(els.analyticsMonth.value);
+    const budget = budgetSeries(year);
+    const saved = monthAmounts(year, (key) => savingsTopup(key));
+    const utilities = monthAmounts(year, (key) => utilityTotal(key));
+    const flow = [
+      { name: "Доходы", color: "#1d6b45", values: budget.income },
+      { name: "Расходы", color: "#8d3a32", values: budget.plan },
+    ];
+    const savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
+    const utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
+    const monthName = monthIndex >= 0 ? MONTHS_RU[monthIndex] : "";
+    const parts = monthIndex >= 0 ? monthParts(year, monthIndex) : null;
+    const breakdown = parts ? `
+      <div class="chart-split">
+        <div>
+          <h4>Доходы · ${escapeAttr(monthName)}</h4>
+          ${rowChart(parts.income, "#1d6b45")}
+        </div>
+        <div>
+          <h4>Расходы · ${escapeAttr(monthName)}</h4>
+          ${rowChart(parts.expenses, "#8d3a32")}
+        </div>
+      </div>
+    ` : "";
+    els.analyticsCharts.innerHTML = `
+      <article class="chart-card">
+        <h4>Доходы и расходы</h4>
+        <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}</p>
+        ${columnChart(MONTHS_SHORT, flow, monthIndex)}
+        ${chartLegend(flow)}
+        ${breakdown}
+      </article>
+      <article class="chart-card">
+        <h4>Откладывания</h4>
+        <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(saved)))}</p>
+        ${columnChart(MONTHS_SHORT, savedSeries, monthIndex)}
+        ${chartLegend(savedSeries)}
+      </article>
+      <article class="chart-card">
+        <h4>Коммуналка</h4>
+        <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(utilities)))}</p>
+        ${columnChart(MONTHS_SHORT, utilitySeries, monthIndex)}
+        ${chartLegend(utilitySeries)}
+      </article>
+    `;
+  }
+
   function render() {
     if (els.rentDialog?.open && rentMenuKey && rentMenuKey !== state.currentMonth) closeRentMenu();
     const month = activeMonth();
@@ -2048,6 +2313,7 @@
     renderExpenses(month);
     renderSavings();
     renderUtilities();
+    renderAnalytics();
     refreshTotalsOnly();
     if (switched) {
       [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
@@ -2163,6 +2429,13 @@
 
   els.btnFillExpenses.addEventListener("click", () => fillExpensesFromPrevious());
 
+  els.btnAddBrokerIncome.addEventListener("click", () => {
+    if (!state.savingsFact.brokerIncomes) state.savingsFact.brokerIncomes = [];
+    state.savingsFact.brokerIncomes.push({ id: uid("brk"), name: "Новый доход", amounts: {} });
+    saveState();
+    renderSavings();
+  });
+
   els.btnClearExpenses.addEventListener("click", () => {
     if (!confirm("Очистить все суммы расходов этого месяца?")) return;
     clearAllExpenses();
@@ -2182,6 +2455,9 @@
   });
 
   els.btnExport.addEventListener("click", exportData);
+  document.getElementById("btnAnalytics").addEventListener("click", () => {
+    document.getElementById("analytics")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   els.btnReset.addEventListener("click", resetFromTable);
   els.btnSettings.addEventListener("click", openSettings);
   els.btnSettingsCancel.addEventListener("click", closeSettings);
