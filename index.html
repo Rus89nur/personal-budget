@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=1.3.3" />
+  <link rel="stylesheet" href="styles.css?v=1.3.4" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4d4a'/%3E%3Cpath d='M14 40h36M18 40V22h10c7 0 7 9 0 9H18M36 40V26h8c5 0 5 7 0 7h-8' stroke='%23e9f4f1' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -20,7 +20,7 @@
         <span class="burger-icon"></span>
         <span class="burger-label">Меню</span>
       </label>
-      <p class="app-version" title="Версия программы">1.3.3</p>
+      <p class="app-version" title="Версия программы">1.3.4</p>
     </div>
   </header>
   <nav class="nav" aria-label="Действия">
@@ -33,7 +33,9 @@
     <p class="nav-note">Данные только в этом браузере</p>
   </nav>
 
+  <div class="hero-stage">
   <header class="hero screen" id="top">
+    <div class="hero-frame">
     <div class="hero-scene" aria-hidden="true">
       <span class="glow glow-a"></span>
       <span class="glow glow-b"></span>
@@ -49,7 +51,9 @@
 <h2 class="month-title" id="monthTitle">январь 2026</h2>
         </div>
       </div>
+    </div>
   </header>
+  </div>
 
   <main class="deck">
     <section class="screen-sheet" id="incomePage">
@@ -211,19 +215,28 @@
         document.getElementById("navToggle").checked = false;
       });
     });
-    const sheets = document.querySelectorAll(".screen-sheet");
-    if (!("IntersectionObserver" in window)) {
-      sheets.forEach((sheet) => sheet.classList.add("is-shown"));
-    } else {
-      const sheetObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) entry.target.classList.add("is-shown");
-          });
-        },
-        { threshold: 0.16 }
-      );
-      sheets.forEach((sheet) => sheetObserver.observe(sheet));
+
+    const frame = document.querySelector(".hero-frame");
+    const deck = document.querySelector(".deck");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (frame && deck && !reduceMotion) {
+      let ticking = false;
+      const place = () => {
+        ticking = false;
+        const vh = window.innerHeight || 1;
+        const cover = Math.min(1, Math.max(0, 1 - deck.getBoundingClientRect().top / vh));
+        frame.style.transform = `scale(${1 - cover * 0.08})`;
+        frame.style.borderRadius = `${cover * 32}px`;
+        if (topbar) topbar.classList.toggle("is-solid", cover > 0.2);
+      };
+      const requestPlace = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(place);
+      };
+      window.addEventListener("scroll", requestPlace, { passive: true });
+      window.addEventListener("resize", requestPlace);
+      place();
     }
   </script>
 
@@ -277,8 +290,8 @@
     </div>
   </dialog>
 
-  <script src="calendar.js?v=1.3.3"></script>
-  <script src="salary.js?v=1.3.3"></script>
-  <script src="app.js?v=1.3.3"></script>
+  <script src="calendar.js?v=1.3.4"></script>
+  <script src="salary.js?v=1.3.4"></script>
+  <script src="app.js?v=1.3.4"></script>
 </body>
 </html>
