@@ -940,6 +940,25 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   color: var(--muted);
 }
 
+.expense-panel .plan-col {
+  position: relative;
+}
+
+.expense-panel .plan-col::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: -0.35rem;
+  right: 0;
+  width: 1px;
+  background: rgba(28, 27, 25, 0.16);
+  pointer-events: none;
+}
+
+.expense-panel tfoot .plan-col::after {
+  bottom: 0;
+}
+
 .expense-panel tbody td,
 .expense-panel .data-table tbody tr:hover td {
   background: transparent;

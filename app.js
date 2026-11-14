@@ -1491,7 +1491,7 @@
     els.expenseHead.innerHTML = `
       <tr>
         <th>Категория</th>
-        <th class="num">
+        <th class="num plan-col">
           <button type="button" class="col-fill" data-fill-key="plan" title="Заполнить столбец из прошлого месяца">
             <span class="col-title">План</span>
             <span class="col-sum" data-sum="plan">${money(incomeTotal)}</span>
@@ -1517,7 +1517,7 @@
     foot.innerHTML = `
       <tr>
         <th class="remain-label">Остаток</th>
-        <th class="num remain-value" data-remain="plan"></th>
+        <th class="num remain-value plan-col" data-remain="plan"></th>
         ${columns.map((col) => `<th class="num remain-value" data-remain-id="${escapeAttr(col.id)}"></th>`).join("")}
         <th></th>
       </tr>
@@ -1533,7 +1533,7 @@
       }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
-        <td class="num">${shareInput(row, "plan")}</td>
+        <td class="num plan-col">${shareInput(row, "plan")}</td>
         ${columns.map((col) => `<td class="num">${shareInput(row, col.key)}</td>`).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
       `;
