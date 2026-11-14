@@ -1140,6 +1140,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   max-width: 100%;
 }
 
+.analytics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .chart-card {
   margin-top: 0.85rem;
 }

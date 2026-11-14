@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.13.5";
+  const APP_VERSION = "1.14.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -452,7 +452,10 @@
     (state.savingsFact?.brokerIncomes || []).forEach((row) => dropMonthKeys(row.amounts, year));
     Object.values(state.utilities?.rows || {}).forEach((amounts) => dropMonthKeys(amounts, year));
     if (state.year === year) attachYear(state, Math.max(...YEARS));
-    if (analyticsYear === year) analyticsYear = state.year;
+    if (Array.isArray(analyticsYears)) {
+      analyticsYears = analyticsYears.filter((item) => item !== year);
+      if (!analyticsYears.length) analyticsYears = [state.year];
+    }
     saveState();
     render();
   }
@@ -2290,9 +2293,88 @@
     node.classList.toggle("delta-neg", value < 0);
   }
 
-  let analyticsYear = null;
-  let analyticsMonth = null;
+  let analyticsYears = null;
+  let analyticsMonths = null;
   let analyticsYearPoints = false;
+
+  function currentAnalyticsSelection() {
+    const key = state.currentMonth;
+    const year = YEARS.includes(yearOf(key)) ? yearOf(key) : state.year;
+    const index = monthIndex(key);
+    return { year, month: index >= 0 && index < 12 ? index : 0 };
+  }
+
+  function ensureAnalyticsFilters() {
+    const current = currentAnalyticsSelection();
+    if (!Array.isArray(analyticsYears)) analyticsYears = [current.year];
+    if (!Array.isArray(analyticsMonths)) analyticsMonths = [current.month];
+    analyticsYears = analyticsYears.filter((year) => YEARS.includes(year));
+    analyticsMonths = analyticsMonths.filter((index) => index >= 0 && index < 12);
+    if (!analyticsYears.length) analyticsYears = [current.year];
+    if (!analyticsMonths.length) analyticsMonths = [current.month];
+  }
+
+  function analyticsIsSingle() {
+    return analyticsYears.length === 1 && analyticsMonths.length === 1;
+  }
+
+  function resetAnalyticsFilters() {
+    const current = currentAnalyticsSelection();
+    analyticsYears = [current.year];
+    analyticsMonths = [current.month];
+    analyticsYearPoints = false;
+    renderAnalytics();
+  }
+
+  function toggleAnalyticsYear(year) {
+    ensureAnalyticsFilters();
+    const selected = analyticsYears.includes(year);
+    if (selected && analyticsYears.length === 1) return;
+    analyticsYears = selected
+      ? analyticsYears.filter((item) => item !== year)
+      : [...analyticsYears, year];
+    analyticsYearPoints = false;
+    renderAnalytics();
+  }
+
+  function toggleAnalyticsMonth(index) {
+    ensureAnalyticsFilters();
+    const selected = analyticsMonths.includes(index);
+    if (selected && analyticsIsSingle()) {
+      analyticsYearPoints = !analyticsYearPoints;
+      renderAnalytics();
+      return;
+    }
+    analyticsMonths = selected
+      ? analyticsMonths.filter((item) => item !== index)
+      : [...analyticsMonths, index];
+    if (!analyticsMonths.length) analyticsMonths = [index];
+    analyticsYearPoints = false;
+    renderAnalytics();
+  }
+
+  function analyticsSlots() {
+    ensureAnalyticsFilters();
+    const years = [...analyticsYears].sort((a, b) => a - b);
+    const months = [...analyticsMonths].sort((a, b) => a - b);
+    const multiYear = years.length > 1;
+    const slots = [];
+    years.forEach((year) => {
+      months.forEach((index) => {
+        const month = yearMonth(year, index);
+        const row = month ? totals(month) : { income: 0, plan: 0 };
+        const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+        slots.push({
+          label: multiYear ? `${MONTHS_SHORT[index]} ${String(year).slice(-2)}` : MONTHS_SHORT[index],
+          income: row.income,
+          plan: row.plan,
+          saved: savingsTopup(key) || 0,
+          utilities: utilityTotal(key) || 0,
+        });
+      });
+    });
+    return slots;
+  }
 
   function yearMonth(year, index) {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
@@ -2537,39 +2619,37 @@
     els.chartStage.dataset.tips = "1";
   }
 
+  function bindAnalyticsReset() {
+    const button = document.getElementById("btnAnalyticsReset");
+    if (!button || button.dataset.bound) return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", resetAnalyticsFilters);
+  }
+
   function renderAnalyticsNav() {
     if (!els.analyticsYear || !els.analyticsMonth) return;
-    if (analyticsYear == null) analyticsYear = state.year;
-    if (analyticsMonth == null) analyticsMonth = monthIndex(state.currentMonth);
+    ensureAnalyticsFilters();
+    const single = analyticsIsSingle();
     els.analyticsYear.innerHTML = "";
     YEARS.forEach((year) => {
+      const pressed = analyticsYears.includes(year);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `month-chip${year === analyticsYear ? " active" : ""}`;
+      btn.className = `month-chip${pressed ? " active" : ""}`;
       btn.textContent = String(year);
-      btn.setAttribute("aria-pressed", year === analyticsYear ? "true" : "false");
-      btn.addEventListener("click", () => {
-        analyticsYear = year;
-        renderAnalytics();
-      });
+      btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+      btn.addEventListener("click", () => toggleAnalyticsYear(year));
       els.analyticsYear.appendChild(btn);
     });
     els.analyticsMonth.innerHTML = "";
     MONTHS_SHORT.forEach((name, index) => {
+      const pressed = analyticsMonths.includes(index) && !(single && analyticsYearPoints);
       const btn = document.createElement("button");
       btn.type = "button";
-      const pressed = !analyticsYearPoints && index === analyticsMonth;
       btn.className = `month-chip${pressed ? " active" : ""}`;
       btn.textContent = name;
       btn.setAttribute("aria-pressed", pressed ? "true" : "false");
-      btn.addEventListener("click", () => {
-        if (!analyticsYearPoints && analyticsMonth === index) analyticsYearPoints = true;
-        else {
-          analyticsMonth = index;
-          analyticsYearPoints = false;
-        }
-        renderAnalytics();
-      });
+      btn.addEventListener("click", () => toggleAnalyticsMonth(index));
       els.analyticsMonth.appendChild(btn);
     });
   }
@@ -2577,26 +2657,63 @@
   function renderAnalytics() {
     if (!els.analyticsCharts || !state) return;
     bindChartTips();
+    bindAnalyticsReset();
     renderAnalyticsNav();
-    const year = analyticsYear;
-    const selectedMonth = analyticsMonth;
-    const budget = budgetSeries(year);
-    const saved = monthAmounts(year, (key) => savingsTopup(key));
-    const utilities = monthAmounts(year, (key) => utilityTotal(key));
-    const flow = [
-      { name: "Доходы", color: "#1d6b45", values: budget.income },
-      { name: "Расходы", color: "#8d3a32", values: budget.plan },
-    ];
-    const savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
-    const utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
-    const monthName = MONTHS_RU[selectedMonth] || "";
-    const parts = analyticsYearPoints ? null : monthParts(year, selectedMonth);
-    const viewNote = analyticsYearPoints
-      ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
-      : "Ещё раз по выбранному месяцу — график с точками за год.";
-    const yearChart = (series) => analyticsYearPoints
-      ? pointChart(MONTHS_SHORT, series)
-      : columnChart(MONTHS_SHORT, series, selectedMonth);
+    const single = analyticsIsSingle();
+    const year = analyticsYears[0];
+    const selectedMonth = analyticsMonths[0];
+    let labels;
+    let flow;
+    let savedSeries;
+    let utilitySeries;
+    let incomeSum;
+    let planSum;
+    let savedSum;
+    let utilitySum;
+    let parts = null;
+    let monthName = "";
+    if (single) {
+      const budget = budgetSeries(year);
+      const saved = monthAmounts(year, (key) => savingsTopup(key));
+      const utilities = monthAmounts(year, (key) => utilityTotal(key));
+      labels = MONTHS_SHORT;
+      flow = [
+        { name: "Доходы", color: "#1d6b45", values: budget.income },
+        { name: "Расходы", color: "#8d3a32", values: budget.plan },
+      ];
+      savedSeries = [{ name: "Отложено", color: "#9a6424", values: saved }];
+      utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: utilities }];
+      incomeSum = sumNumbers(budget.income);
+      planSum = sumNumbers(budget.plan);
+      savedSum = sumNumbers(saved);
+      utilitySum = sumNumbers(utilities);
+      monthName = MONTHS_RU[selectedMonth] || "";
+      parts = analyticsYearPoints ? null : monthParts(year, selectedMonth);
+    } else {
+      const slots = analyticsSlots();
+      labels = slots.map((slot) => slot.label);
+      flow = [
+        { name: "Доходы", color: "#1d6b45", values: slots.map((slot) => slot.income) },
+        { name: "Расходы", color: "#8d3a32", values: slots.map((slot) => slot.plan) },
+      ];
+      savedSeries = [{ name: "Отложено", color: "#9a6424", values: slots.map((slot) => slot.saved) }];
+      utilitySeries = [{ name: "Коммуналка", color: "#1f4d4a", values: slots.map((slot) => slot.utilities) }];
+      incomeSum = sumNumbers(flow[0].values);
+      planSum = sumNumbers(flow[1].values);
+      savedSum = sumNumbers(savedSeries[0].values);
+      utilitySum = sumNumbers(utilitySeries[0].values);
+    }
+    const viewNote = single
+      ? (analyticsYearPoints
+        ? "Точки по месяцам за год. Нажмите месяц — снова столбцы."
+        : "Ещё раз по выбранному месяцу — график с точками за год.")
+      : "Показаны только отмеченные годы и месяцы.";
+    const scope = single ? `За ${year}` : "За выбранное";
+    const yearChart = (series) => {
+      if (single && analyticsYearPoints) return pointChart(labels, series);
+      if (single) return columnChart(labels, series, selectedMonth);
+      return columnChart(labels, series, -1);
+    };
     const breakdown = parts ? `
       <div class="chart-split">
         <div>
@@ -2612,20 +2729,20 @@
     els.analyticsCharts.innerHTML = `
       <article class="chart-card">
         <h4>Доходы и расходы</h4>
-        <p class="chart-note">За ${year}: доходы ${escapeAttr(money(sumNumbers(budget.income)))}, расходы ${escapeAttr(money(sumNumbers(budget.plan)))}. ${viewNote}</p>
+        <p class="chart-note">${scope}: доходы ${escapeAttr(money(incomeSum))}, расходы ${escapeAttr(money(planSum))}. ${viewNote}</p>
         ${yearChart(flow)}
         ${chartLegend(flow)}
         ${breakdown}
       </article>
       <article class="chart-card">
         <h4>Откладывания</h4>
-        <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(saved)))}</p>
+        <p class="chart-note">${single ? `Общая сумма по месяцам ${year}` : "Общая сумма"}: ${escapeAttr(money(savedSum))}</p>
         ${yearChart(savedSeries)}
         ${chartLegend(savedSeries)}
       </article>
       <article class="chart-card">
         <h4>Коммуналка</h4>
-        <p class="chart-note">Общая сумма по месяцам ${year}: ${escapeAttr(money(sumNumbers(utilities)))}</p>
+        <p class="chart-note">${single ? `Общая сумма по месяцам ${year}` : "Общая сумма"}: ${escapeAttr(money(utilitySum))}</p>
         ${yearChart(utilitySeries)}
         ${chartLegend(utilitySeries)}
       </article>
