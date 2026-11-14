@@ -44,7 +44,10 @@
     settingsDialog: document.getElementById("settingsDialog"),
     settingsForm: document.getElementById("settingsForm"),
     settingsOklad: document.getElementById("settingsOklad"),
-    settingsCalc: document.getElementById("settingsCalc"),
+    regionalAmount: document.getElementById("regionalAmount"),
+    northernAmount: document.getElementById("northernAmount"),
+    grossAmount: document.getElementById("grossAmount"),
+    netAmount: document.getElementById("netAmount"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
     btnSettingsSave: document.getElementById("btnSettingsSave"),
   };
@@ -338,52 +341,17 @@
     });
   }
 
-  function formatRate(rate) {
-    if (rate == null) return "";
-    const pct = rate * 100;
-    if (Math.abs(pct % 1) < 1e-9) return `${Math.round(pct)}%`;
-    return `${String(Math.round(pct * 10) / 10).replace(".", ",")}%`;
+  function lineAmount(calc, key) {
+    const line = calc.lines.find((item) => item.key === key);
+    return line ? line.amount : 0;
   }
 
   function renderSettingsCalc(oklad) {
     const calc = Salary.calculateFromOklad(oklad);
-    const rows = [];
-
-    rows.push(`
-      <div class="calc-row highlight">
-        <span class="calc-label">Аванс</span>
-        <span class="calc-rate">${calc.advancePct}%</span>
-        <span class="calc-amount">${money(calc.advance)}</span>
-      </div>
-      <div class="calc-row highlight">
-        <span class="calc-label">ЗП</span>
-        <span class="calc-rate">${calc.salaryPct}%</span>
-        <span class="calc-amount">${money(calc.salary)}</span>
-      </div>
-      <div class="calc-row total">
-        <span class="calc-label">После вычета налога (13%)</span>
-        <span class="calc-rate"></span>
-        <span class="calc-amount">${money(calc.net)}</span>
-      </div>
-      <div class="calc-row total">
-        <span class="calc-label">Общий облагаемый доход</span>
-        <span class="calc-rate"></span>
-        <span class="calc-amount">${money(calc.grossTaxable)}</span>
-      </div>
-    `);
-
-    calc.lines.forEach((line) => {
-      if (line.key === "oklad") return;
-      rows.push(`
-        <div class="calc-row">
-          <span class="calc-label">${escapeAttr(line.label)}</span>
-          <span class="calc-rate">${formatRate(line.rate)}</span>
-          <span class="calc-amount">${money(line.amount)}</span>
-        </div>
-      `);
-    });
-
-    els.settingsCalc.innerHTML = rows.join("");
+    els.regionalAmount.textContent = money(lineAmount(calc, "regional"));
+    els.northernAmount.textContent = money(lineAmount(calc, "northern"));
+    els.grossAmount.textContent = money(calc.grossTaxable);
+    els.netAmount.textContent = money(calc.net);
   }
 
   function openSettings() {
@@ -394,7 +362,10 @@
       renderSettingsCalc(state.oklad);
     } catch (err) {
       console.error(err);
-      els.settingsCalc.innerHTML = `<p class="month-hint">Не удалось посчитать зарплату.</p>`;
+      els.regionalAmount.textContent = "—";
+      els.northernAmount.textContent = "—";
+      els.grossAmount.textContent = "—";
+      els.netAmount.textContent = "—";
     }
     if (typeof els.settingsDialog.showModal === "function") {
       if (!els.settingsDialog.open) els.settingsDialog.showModal();

@@ -13,6 +13,7 @@
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
+  <p class="app-version" title="Версия программы">1.1.0</p>
 
   <header class="hero">
     <p class="hero-kicker">как вкладка Бюджет_2026</p>
@@ -152,17 +153,38 @@
       <header class="settings-head">
         <div>
           <h2 id="settingsTitle">Настройки зарплаты</h2>
-          <p>Только оклад можно менять — остальное считается как на листе «ЗП».</p>
+          <p>Меняется только оплата по окладу. Районный коэффициент — 70% от неё, северная надбавка — 80%.</p>
         </div>
         <button type="button" class="icon-x" id="btnSettingsClose" aria-label="Закрыть">×</button>
       </header>
 
-      <label class="field settings-oklad">
-        <span>Оклад</span>
-        <input type="text" inputmode="decimal" id="settingsOklad" name="oklad" autocomplete="off" />
-      </label>
-
-      <div class="settings-calc" id="settingsCalc" aria-live="polite"></div>
+      <div class="settings-calc" id="settingsCalc" aria-live="polite">
+        <div class="calc-row">
+          <span class="calc-label">Районный коэффициент</span>
+          <span class="calc-rate">70%</span>
+          <span class="calc-amount" id="regionalAmount">—</span>
+        </div>
+        <div class="calc-row">
+          <span class="calc-label">Северная надбавка</span>
+          <span class="calc-rate">80%</span>
+          <span class="calc-amount" id="northernAmount">—</span>
+        </div>
+        <label class="calc-row settings-oklad">
+          <span class="calc-label">Оплата по окладу</span>
+          <span class="calc-rate"></span>
+          <input type="text" inputmode="decimal" id="settingsOklad" name="oklad" autocomplete="off" />
+        </label>
+        <div class="calc-row total">
+          <span class="calc-label">Облагаемый доход</span>
+          <span class="calc-rate"></span>
+          <span class="calc-amount" id="grossAmount">—</span>
+        </div>
+        <div class="calc-row total">
+          <span class="calc-label">После вычета налога (13%) на руки</span>
+          <span class="calc-rate"></span>
+          <span class="calc-amount" id="netAmount">—</span>
+        </div>
+      </div>
 
       <footer class="settings-foot">
         <button type="button" class="btn btn-ghost" id="btnSettingsCancel">Отмена</button>
