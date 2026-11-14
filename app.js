@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.8";
+  const APP_VERSION = "1.8.9";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -243,6 +243,47 @@
 
   function isTitheRow(row) {
     return String(row?.name || "").trim() === "10%";
+  }
+
+  function isSetAsideRow(row) {
+    return String(row?.name || "").trim().toLowerCase() === "отложить";
+  }
+
+  function setAsideMonthAmount(row) {
+    normalizeExpense(row);
+    const plan = cellValue(row, "plan");
+    if (plan != null) return plan;
+    return Object.keys(row.shares || {}).reduce((sum, key) => {
+      const value = cellValue(row, key);
+      return value == null ? sum : sum + value;
+    }, 0);
+  }
+
+  function setAsideSoFar() {
+    const year = state.year;
+    const limit = state.currentMonth;
+    let sum = 0;
+    monthKeys(year).forEach((key) => {
+      if (key > limit) return;
+      const month = state.years[year]?.months[key];
+      if (!month?.expenses) return;
+      month.expenses.forEach((row) => {
+        if (isSetAsideRow(row)) sum += setAsideMonthAmount(row);
+      });
+    });
+    return Math.round(sum * 100) / 100;
+  }
+
+  function setAsideHintText() {
+    return `С начала года ${money(setAsideSoFar())}`;
+  }
+
+  function paintSetAsideHint() {
+    const hint = document.querySelector("#expenseBody .set-aside-hint");
+    if (!hint) return;
+    const text = setAsideHintText();
+    hint.textContent = text;
+    hint.closest("tr")?.setAttribute("title", text);
   }
 
   function titheSuggestion(key) {
@@ -1531,8 +1572,12 @@
         tr.classList.add("row-in");
         tr.style.animationDelay = `${Math.min(index, 12) * 0.04}s`;
       }
+      if (isSetAsideRow(row)) tr.classList.add("set-aside-row");
+      const asideHint = isSetAsideRow(row)
+        ? `<span class="set-aside-hint">${escapeAttr(setAsideHintText())}</span>`
+        : "";
       tr.innerHTML = `
-        <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
+        <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />${asideHint}</td>
         <td class="num plan-col">${shareInput(row, "plan")}</td>
         ${columns.map((col) => `<td class="num">${shareInput(row, col.key)}</td>`).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
@@ -1668,6 +1713,7 @@
       paintRemain(left, amount - columnSum(month, incomeColumnKey(row)));
     });
     paintPlanShortfalls(month);
+    paintSetAsideHint();
   }
 
   const SAVINGS_MONTHS = [

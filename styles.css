@@ -791,9 +791,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   scroll-margin-bottom: 7rem;
 }
 
-.field input:not([type="checkbox"]):not([type="radio"]),
-.data-table input:not([type="checkbox"]):not([type="radio"]),
-.data-table select {
+.field input:not([type="checkbox"]):not([type="radio"]) {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -807,10 +805,31 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   appearance: none;
 }
 
-.field input:focus,
-.data-table input:focus {
+.data-table input:not([type="checkbox"]):not([type="radio"]),
+.data-table select {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  min-height: var(--tap);
+  padding: 0.45rem 0.4rem;
+  font: inherit;
+  font-size: var(--field-fs);
+  color: var(--ink);
+  background: transparent;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field input:focus {
   outline: 2px solid rgba(28, 27, 25, 0.2);
   border-color: rgba(28, 27, 25, 0.35);
+}
+
+.data-table input:focus,
+.data-table select:focus {
+  outline: none;
+  border-color: transparent;
 }
 
 .table-wrap {
@@ -829,7 +848,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .expense-panel .data-table tbody tr.is-total td,
 .expense-panel .data-table tbody tr.is-total:hover td {
-  background: #fff;
+  background: transparent;
 }
 
 .expense-panel .data-table tbody tr.is-total td:first-child {
@@ -855,7 +874,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .data-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent;
 }
 
 .data-table thead th {
@@ -972,17 +991,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   background: transparent;
 }
 
-.expense-panel .data-table input {
-  border: none;
-  background: transparent;
-  border-radius: 12px;
-  box-shadow: none;
-  padding: 0.45rem 0.4rem;
+.data-table tbody input,
+.data-table tbody select {
   transition: background 0.16s ease;
 }
 
-.expense-panel .data-table tbody input:hover,
-.expense-panel .data-table tbody input:focus {
+.data-table tbody input:hover,
+.data-table tbody input:focus,
+.data-table tbody select:hover,
+.data-table tbody select:focus {
   background: rgba(28, 27, 25, 0.06);
   outline: none;
 }
@@ -1010,7 +1027,7 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 
 .expense-panel #expenseFoot th {
   color: var(--ink);
-  background: #fff;
+  background: transparent;
   font-weight: 700;
 }
 
@@ -1072,7 +1089,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   cursor: default;
 }
 
-.rent-row td:first-child {
+.rent-row td:first-child,
+.set-aside-row td:first-child {
   position: relative;
 }
 
@@ -1080,7 +1098,8 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
   cursor: pointer;
 }
 
-.rent-hint {
+.rent-hint,
+.set-aside-hint {
   position: absolute;
   right: 0.85rem;
   top: 50%;
@@ -1100,12 +1119,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(3) { animation-delay: 0.12s; 
 }
 
 .rent-row:hover .rent-hint,
-.rent-row:focus-within .rent-hint {
+.rent-row:focus-within .rent-hint,
+.set-aside-row:hover .set-aside-hint,
+.set-aside-row:focus-within .set-aside-hint {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .rent-hint {
+  .rent-hint,
+  .set-aside-hint {
     opacity: 0.92;
     position: static;
     transform: none;
