@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.7.1";
+  const APP_VERSION = "1.8.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -72,6 +72,8 @@
     rentAdd: document.getElementById("rentAdd"),
     savingsHead: document.getElementById("savingsHead"),
     savingsBody: document.getElementById("savingsBody"),
+    utilitiesHead: document.getElementById("utilitiesHead"),
+    utilitiesBody: document.getElementById("utilitiesBody"),
   };
 
   let seedTemplate = null;
@@ -379,6 +381,7 @@
     ensureTitheStructure(next);
     applySheetNovemberCosts(next);
     next.savingsFact = defaultSavingsFact();
+    next.utilities = defaultUtilities();
     return next;
   }
 
@@ -1021,7 +1024,7 @@
     if (!isNumericField(input) || input.dataset.keepEmpty === "1") return;
     const raw = input.value;
     if (raw.trim() === "") {
-      if (input.closest("#expenseTable, #savingsTable")) return;
+      if (input.closest("#expenseTable, #savingsTable, #utilitiesTable")) return;
       input.value = "0";
       input.dataset.zeroArmed = "1";
       input.select();
@@ -1656,49 +1659,201 @@
     return savingsDelta(key);
   }
 
+  function previousMonthKey(key) {
+    const year = Number(String(key).slice(0, 4));
+    const month = Number(String(key).slice(5, 7));
+    if (month <= 1) return `${year - 1}-12`;
+    return `${year}-${String(month - 1).padStart(2, "0")}`;
+  }
+
+  function monthChip(key) {
+    const index = Number(String(key).slice(5, 7)) - 1;
+    if (index < 0 || index > 11) return String(key);
+    return `${MONTHS_SHORT[index]} ${String(key).slice(0, 4)}`;
+  }
+
+  function compareView(current, previous) {
+    const compare = utilityCompare(current, previous);
+    return {
+      currentText: current == null ? "—" : formatEditable(current),
+      prevText: previous == null ? "—" : formatEditable(previous),
+      delta: compare ? `<span class="${utilityTone(compare.delta).trim()}">${formatSigned(compare.delta)}</span>` : "—",
+      percent: compare ? `<span class="${utilityTone(compare.percent).trim()}">${formatPercent(compare.percent)}</span>` : "—",
+    };
+  }
+
   function renderSavings() {
     if (!els.savingsHead || !els.savingsBody || !state.savingsFact) return;
+    const key = state.currentMonth;
+    const prevKey = previousMonthKey(key);
     els.savingsHead.innerHTML = `
       <tr>
-        <th>План / факт</th>
-        ${SAVINGS_MONTHS.map(([key, label, year]) => `
-          <th class="num${key === state.currentMonth ? " is-current" : ""}">
-            <span class="col-title">${label}</span>
-            <span class="col-sum">${year}</span>
-          </th>
-        `).join("")}
+        <th>Строка</th>
+        <th class="num">${escapeAttr(monthChip(prevKey))}</th>
+        <th class="num">${escapeAttr(monthChip(key))}</th>
+        <th class="num">Разница</th>
+        <th class="num">%</th>
       </tr>
     `;
     els.savingsBody.innerHTML = "";
     SAVINGS_ROWS.forEach((row) => {
       const tr = document.createElement("tr");
       if (row.calc) tr.classList.add("is-total");
-      const cells = SAVINGS_MONTHS.map(([key]) => {
-        if (row.calc) {
-          const value = savingsCalc(row.calc, key);
-          const tone = row.calc === "delta" && value != null ? (value < 0 ? " delta-neg" : " delta-pos") : "";
-          const shown = value == null ? "—" : formatEditable(value);
-          return `<td class="num"><span class="is-calc${tone}">${shown}</span></td>`;
-        }
-        const value = savingsStored(row.id, key);
-        return `<td class="num"><input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" data-month="${key}" value="${value == null ? "" : formatEditable(value)}" placeholder="—" /></td>`;
-      }).join("");
-      tr.innerHTML = `<td>${escapeAttr(row.name)}</td>${cells}`;
-      tr.querySelectorAll("[data-month]").forEach((input) => {
+      const current = row.calc ? savingsCalc(row.calc, key) : savingsStored(row.id, key);
+      const previous = row.calc ? savingsCalc(row.calc, prevKey) : savingsStored(row.id, prevKey);
+      const view = compareView(current, previous);
+      const currentCell = row.calc
+        ? `<span class="is-calc">${view.currentText}</span>`
+        : `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`;
+      tr.innerHTML = `
+        <td>${escapeAttr(row.name)}</td>
+        <td class="num"><span class="is-calc">${view.prevText}</span></td>
+        <td class="num">${currentCell}</td>
+        <td class="num"><span class="is-calc">${view.delta}</span></td>
+        <td class="num"><span class="is-calc">${view.percent}</span></td>
+      `;
+      const input = tr.querySelector("input");
+      if (input) {
         input.addEventListener("change", () => {
-          const id = input.dataset.row;
-          const month = input.dataset.month;
           const parsed = parseNumber(input.value);
-          if (!state.savingsFact.rows[id]) state.savingsFact.rows[id] = {};
-          if (parsed == null) delete state.savingsFact.rows[id][month];
-          else state.savingsFact.rows[id][month] = parsed;
-          input.value = parsed == null ? "" : formatEditable(parsed);
+          if (!state.savingsFact.rows[row.id]) state.savingsFact.rows[row.id] = {};
+          if (parsed == null) delete state.savingsFact.rows[row.id][key];
+          else state.savingsFact.rows[row.id][key] = parsed;
           saveState();
           renderSavings();
         });
-      });
+      }
       els.savingsBody.appendChild(tr);
     });
+  }
+
+  const UTILITY_MONTHS = [
+    ["2025-12", "дек", "2025"],
+    ["2026-01", "янв", "2026"], ["2026-02", "фев", "2026"], ["2026-03", "мар", "2026"],
+    ["2026-04", "апр", "2026"], ["2026-05", "май", "2026"], ["2026-06", "июн", "2026"],
+    ["2026-07", "июл", "2026"], ["2026-08", "авг", "2026"], ["2026-09", "сен", "2026"],
+    ["2026-10", "окт", "2026"], ["2026-11", "ноя", "2026"],
+  ];
+
+  const UTILITY_ROWS = [
+    { id: "quietBrus", name: "Тюменская брусника (тихий)" },
+    { id: "quietUtil", name: "Тюменская комуналка (тихий)" },
+    { id: "gazBrus", name: "Тюменская брусника (газовиков)" },
+    { id: "gazUtil", name: "Тюменская комуналка (газовиков)" },
+    { id: "gas", name: "Газ (НУР)" },
+    { id: "nur", name: "Комуналка (НУР)" },
+    { id: "light", name: "Свет (НУР)" },
+    { id: "door", name: "Домофон" },
+  ];
+
+  function defaultUtilities() {
+    return {
+      rows: {
+        quietBrus: { "2025-12": 1891.66, "2026-01": 1894, "2026-02": 1888.52, "2026-03": 1864.77, "2026-04": 1833.41, "2026-05": 1902, "2026-06": 1878.25, "2026-07": 1841.57, "2026-08": 1855.72, "2026-09": 1888, "2026-10": 0, "2026-11": 0 },
+        quietUtil: { "2025-12": 1937.3, "2026-01": 2600, "2026-02": 2433.17, "2026-03": 2109.59, "2026-04": 2122.65, "2026-05": 1211, "2026-06": 874, "2026-07": 1077.14, "2026-08": 1230.74, "2026-09": 2451, "2026-10": 0, "2026-11": 0 },
+        gazBrus: { "2025-12": 1581.73, "2026-01": 1643, "2026-02": 1612.83, "2026-03": 1667.44, "2026-04": 1604.56, "2026-05": 1662, "2026-06": 1578.08, "2026-07": 1700.06, "2026-08": 1662.51, "2026-09": 1703, "2026-10": 0, "2026-11": 0 },
+        gazUtil: { "2025-12": 2624.33, "2026-01": 3046, "2026-02": 2645.3, "2026-03": 2625.09, "2026-04": 1847.13, "2026-05": 1532, "2026-06": 1269.65, "2026-07": 1204.08, "2026-08": 1332.22, "2026-09": 1328, "2026-10": 0, "2026-11": 0 },
+        gas: { "2025-12": 363.79, "2026-01": 363.79, "2026-02": 369.85, "2026-03": 369.85, "2026-04": 369.85, "2026-05": 369, "2026-06": 369.85, "2026-07": 369.85, "2026-08": 369.85, "2026-09": 369, "2026-10": 0, "2026-11": 0 },
+        nur: { "2025-12": 11132, "2026-01": 13375, "2026-02": 11962, "2026-03": 12267.52, "2026-04": 10253.34, "2026-05": 5506, "2026-06": 7420.06, "2026-07": 3483.87, "2026-08": 3240, "2026-09": 4142, "2026-10": 0, "2026-11": 0 },
+        light: { "2025-12": 2176.87, "2026-01": 3684, "2026-02": 3205.1, "2026-03": 1932.32, "2026-04": 2199.6, "2026-05": 1532, "2026-06": 1879.57, "2026-07": 3416.76, "2026-08": 1542, "2026-09": 2479.8, "2026-10": 0, "2026-11": 0 },
+        door: { "2026-02": 1000, "2026-04": 500 },
+      },
+    };
+  }
+
+  function ensureUtilities(target) {
+    if (target.utilities?.rows) return false;
+    target.utilities = defaultUtilities();
+    return true;
+  }
+
+  function utilityStored(id, key) {
+    const value = state.utilities?.rows?.[id]?.[key];
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function utilityTotal(key) {
+    const parts = UTILITY_ROWS.map((row) => utilityStored(row.id, key)).filter((value) => value != null);
+    if (!parts.length) return null;
+    return Math.round(parts.reduce((sum, value) => sum + value, 0) * 100) / 100;
+  }
+
+  function utilityCompare(current, previous) {
+    if (current == null || previous == null) return null;
+    const delta = Math.round((current - previous) * 100) / 100;
+    const percent = previous === 0 ? null : delta / previous;
+    return { delta, percent };
+  }
+
+  function formatSigned(n) {
+    if (n == null || Number.isNaN(n)) return "";
+    const text = formatEditable(Math.abs(n));
+    if (n > 0) return `+${text}`;
+    if (n < 0) return `−${text}`;
+    return "0";
+  }
+
+  function formatPercent(ratio) {
+    if (ratio == null || !Number.isFinite(ratio)) return "—";
+    const pct = Math.round(ratio * 1000) / 10;
+    const text = Math.abs(pct).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+    if (pct > 0) return `+${text}%`;
+    if (pct < 0) return `−${text}%`;
+    return "0%";
+  }
+
+  function utilityTone(n) {
+    if (n == null || n === 0) return "";
+    return n > 0 ? " delta-pos" : " delta-neg";
+  }
+
+  function renderUtilities() {
+    if (!els.utilitiesHead || !els.utilitiesBody || !state.utilities) return;
+    const key = state.currentMonth;
+    const prevKey = previousMonthKey(key);
+    els.utilitiesHead.innerHTML = `
+      <tr>
+        <th>Строка</th>
+        <th class="num">${escapeAttr(monthChip(prevKey))}</th>
+        <th class="num">${escapeAttr(monthChip(key))}</th>
+        <th class="num">Разница</th>
+        <th class="num">%</th>
+      </tr>
+    `;
+    els.utilitiesBody.innerHTML = "";
+    const paintRow = (title, currentOf, editableId) => {
+      const tr = document.createElement("tr");
+      if (!editableId) tr.classList.add("is-total");
+      const current = currentOf(key);
+      const previous = currentOf(prevKey);
+      const view = compareView(current, previous);
+      const currentCell = editableId
+        ? `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`
+        : `<span class="is-calc">${view.currentText}</span>`;
+      tr.innerHTML = `
+        <td>${escapeAttr(title)}</td>
+        <td class="num"><span class="is-calc">${view.prevText}</span></td>
+        <td class="num">${currentCell}</td>
+        <td class="num"><span class="is-calc">${view.delta}</span></td>
+        <td class="num"><span class="is-calc">${view.percent}</span></td>
+      `;
+      const input = tr.querySelector("input");
+      if (input) {
+        input.addEventListener("change", () => {
+          const parsed = parseNumber(input.value);
+          if (!state.utilities.rows[editableId]) state.utilities.rows[editableId] = {};
+          if (parsed == null) delete state.utilities.rows[editableId][key];
+          else state.utilities.rows[editableId][key] = parsed;
+          saveState();
+          renderUtilities();
+        });
+      }
+      els.utilitiesBody.appendChild(tr);
+    };
+    UTILITY_ROWS.forEach((row) => paintRow(row.name, (month) => utilityStored(row.id, month), row.id));
+    paintRow("Итого", utilityTotal, "");
   }
 
   function paintRemain(node, value) {
@@ -1725,6 +1880,7 @@
     renderIncome(month);
     renderExpenses(month);
     renderSavings();
+    renderUtilities();
     refreshTotalsOnly();
     if (switched) {
       [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
@@ -1758,6 +1914,7 @@
       dailyAverage: state.dailyAverage,
       rentDefaults: state.rentDefaults,
       savingsFact: state.savingsFact,
+      utilities: state.utilities,
       months: state.months,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -1805,6 +1962,7 @@
         dropKvFromDecember(next);
         ensureTitheStructure(next);
         if (data.savingsFact && typeof data.savingsFact === "object") next.savingsFact = data.savingsFact;
+        if (data.utilities && typeof data.utilities === "object") next.utilities = data.utilities;
         if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
         state = next;
         saveState();
@@ -1937,7 +2095,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || ensureSavingsFact(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || ensureSavingsFact(state) || ensureUtilities(state)) saveState();
     render();
   }
 
