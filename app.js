@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.9.1";
+  const APP_VERSION = "1.9.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1962,6 +1962,15 @@
     return "0%";
   }
 
+  function utilityNameCell(label) {
+    const text = String(label);
+    const cut = text.indexOf(" (");
+    if (cut === -1) return `<span class="utility-name">${escapeAttr(text)}</span>`;
+    const main = text.slice(0, cut);
+    const extra = text.slice(cut + 1);
+    return `<span class="utility-name">${escapeAttr(main)}<span class="utility-name-sub">${escapeAttr(extra)}</span></span>`;
+  }
+
   function utilityTone(n) {
     if (n == null || n === 0) return "";
     return n > 0 ? " delta-pos" : " delta-neg";
@@ -1991,7 +2000,7 @@
         ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
         : readCell(view.currentText);
       tr.innerHTML = `
-        <td>${nameCell(title)}</td>
+        <td>${utilityNameCell(title)}</td>
         <td class="num">${readCell(view.prevText)}</td>
         <td class="num">${currentCell}</td>
         <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
