@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.6.4";
+  const APP_VERSION = "1.7.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -70,6 +70,8 @@
     rentList: document.getElementById("rentList"),
     rentSum: document.getElementById("rentSum"),
     rentAdd: document.getElementById("rentAdd"),
+    savingsHead: document.getElementById("savingsHead"),
+    savingsBody: document.getElementById("savingsBody"),
   };
 
   let seedTemplate = null;
@@ -376,6 +378,7 @@
     dropKvFromDecember(next);
     ensureTitheStructure(next);
     applySheetNovemberCosts(next);
+    next.savingsFact = defaultSavingsFact();
     return next;
   }
 
@@ -1018,7 +1021,7 @@
     if (!isNumericField(input) || input.dataset.keepEmpty === "1") return;
     const raw = input.value;
     if (raw.trim() === "") {
-      if (input.closest("#expenseTable")) return;
+      if (input.closest("#expenseTable, #savingsTable")) return;
       input.value = "0";
       input.dataset.zeroArmed = "1";
       input.select();
@@ -1388,8 +1391,10 @@
       <tr>
         <th>Категория</th>
         <th class="num">
-          <span class="col-title">План</span>
-          <span class="col-sum" data-sum="plan">${money(incomeTotal)}</span>
+          <button type="button" class="col-fill" data-fill-key="plan" title="Заполнить столбец из прошлого месяца">
+            <span class="col-title">План</span>
+            <span class="col-sum" data-sum="plan">${money(incomeTotal)}</span>
+          </button>
         </th>
         ${columns.map((col) => `
           <th class="num">
@@ -1522,10 +1527,10 @@
     );
   }
 
-  function planIsShort(row) {
+  function planGap(row) {
     const plan = cellValue(row, "plan");
-    if (plan == null) return false;
-    return Math.round(enteredRowSum(row) * 100) < Math.round(plan * 100);
+    if (plan == null) return 0;
+    return Math.round(enteredRowSum(row) * 100) - Math.round(plan * 100);
   }
 
   function paintPlanShortfalls(month) {
@@ -1534,9 +1539,11 @@
         `#expenseBody tr[data-exp="${CSS.escape(row.id)}"] input[data-key="plan"]`
       );
       if (!input) return;
-      const short = planIsShort(row);
-      input.classList.toggle("plan-short", short);
-      if (short) input.title = "По строке введено меньше плана";
+      const gap = planGap(row);
+      input.classList.toggle("plan-short", gap < 0);
+      input.classList.toggle("plan-over", gap > 0);
+      if (gap < 0) input.title = "По строке введено меньше плана";
+      else if (gap > 0) input.title = "По строке введено больше плана";
       else input.removeAttribute("title");
     });
   }
@@ -1562,6 +1569,138 @@
     paintPlanShortfalls(month);
   }
 
+  const SAVINGS_MONTHS = [
+    ["2025-08", "авг", "2025"], ["2025-09", "сен", "2025"], ["2025-10", "окт", "2025"],
+    ["2025-11", "ноя", "2025"], ["2025-12", "дек", "2025"],
+    ["2026-01", "янв", "2026"], ["2026-02", "фев", "2026"], ["2026-03", "мар", "2026"],
+    ["2026-04", "апр", "2026"], ["2026-05", "май", "2026"], ["2026-06", "июн", "2026"],
+    ["2026-07", "июл", "2026"], ["2026-08", "авг", "2026"], ["2026-09", "сен", "2026"],
+    ["2026-10", "окт", "2026"], ["2026-11", "ноя", "2026"], ["2026-12", "дек", "2026"],
+  ];
+
+  const SAVINGS_ROWS = [
+    { id: "deposit", name: "Вклад" },
+    { id: "broker", name: "Брокерский счет" },
+    { id: "iis", name: "ИИС" },
+    { id: "iis3", name: "ИИС 3" },
+    { id: "flat1", name: "Квартира 1" },
+    { id: "flat2", name: "Квартира 2" },
+    { id: "garage", name: "Гараж" },
+    { id: "own", name: "Вложил свои" },
+    { id: "earned", name: "Заработал в месяц", calc: "earned" },
+    { id: "capitalPlan", name: "Капитал план" },
+    { id: "capitalFact", name: "Капитал факт" },
+    { id: "delta", name: "Прирост", calc: "delta" },
+    { id: "topup", name: "Пополнил БС", calc: "topup" },
+  ];
+
+  const SAVINGS_EARNED = ["deposit", "broker", "iis", "iis3", "flat1", "flat2", "garage"];
+
+  function defaultSavingsFact() {
+    return {
+      rows: {
+        deposit: { "2026-01": 30640, "2026-02": 20963, "2026-03": 32708, "2026-04": 24695 },
+        broker: { "2025-08": 18000, "2025-11": 8368, "2025-12": 14606, "2026-01": 5461, "2026-02": 4169, "2026-03": 6377.04, "2026-05": 32205.73, "2026-06": 36835.8, "2026-07": 37503, "2026-08": 42123, "2026-09": 39944.3, "2026-10": 56306.7 },
+        iis: {},
+        iis3: {},
+        flat1: { "2025-08": 19000, "2025-11": 19500, "2025-12": 19000, "2026-01": 19000, "2026-02": 19500, "2026-03": 19500, "2026-04": 19500, "2026-05": 21338, "2026-06": 20748, "2026-07": 20100, "2026-08": 20414, "2026-09": 20484, "2026-10": 21667 },
+        flat2: { "2025-08": 25000, "2025-11": 29611, "2025-12": 30440, "2026-01": 25000, "2026-02": 25000, "2026-03": 25000, "2026-04": 25000, "2026-05": 28451, "2026-06": 28500, "2026-07": 30000, "2026-08": 26595, "2026-09": 3651, "2026-10": 0 },
+        garage: { "2025-08": 16500, "2025-11": 16500, "2025-12": 16500, "2026-01": 16500, "2026-02": 16500, "2026-03": 16500, "2026-04": 6500, "2026-05": 16500, "2026-06": 16500, "2026-07": 16500, "2026-08": 16500, "2026-09": 16500, "2026-10": 16500 },
+        own: { "2026-01": 60000, "2026-02": 145870, "2026-03": 0, "2026-04": 118000, "2026-05": 118000, "2026-06": 108000, "2026-07": 0, "2026-08": 200000, "2026-09": 90000, "2026-10": 120000, "2026-11": 36468, "2026-12": 60000 },
+        capitalPlan: { "2025-08": 997662, "2025-09": 997662, "2025-10": 2989305, "2025-11": 3063284, "2025-12": 3143830, "2026-01": 3109070, "2026-02": 3341072, "2026-04": 3694388, "2026-05": 3910882.73, "2026-06": 3518867.8, "2026-07": 3622970.8, "2026-08": 3928602.8, "2026-09": 4099182.1, "2026-10": 4313655.8, "2026-11": 4350123.8, "2026-12": 4410123.8 },
+        capitalFact: { "2025-12": 2952469, "2026-03": 3525388, "2026-05": 3308284 },
+      },
+    };
+  }
+
+  function ensureSavingsFact(target) {
+    if (target.savingsFact?.rows) return false;
+    target.savingsFact = defaultSavingsFact();
+    return true;
+  }
+
+  function savingsStored(id, key) {
+    const value = state.savingsFact?.rows?.[id]?.[key];
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function savingsRound(n) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function savingsEarned(key) {
+    const parts = SAVINGS_EARNED.map((id) => savingsStored(id, key)).filter((value) => value != null);
+    if (!parts.length) return null;
+    return savingsRound(parts.reduce((sum, value) => sum + value, 0));
+  }
+
+  function savingsTopup(key) {
+    const earned = savingsEarned(key);
+    const own = savingsStored("own", key);
+    if (earned == null && own == null) return null;
+    return savingsRound((earned || 0) + (own || 0));
+  }
+
+  function savingsDelta(key) {
+    const plan = savingsStored("capitalPlan", key);
+    const fact = savingsStored("capitalFact", key);
+    if (plan == null || fact == null) return null;
+    return savingsRound(fact - plan);
+  }
+
+  function savingsCalc(kind, key) {
+    if (kind === "earned") return savingsEarned(key);
+    if (kind === "topup") return savingsTopup(key);
+    return savingsDelta(key);
+  }
+
+  function renderSavings() {
+    if (!els.savingsHead || !els.savingsBody || !state.savingsFact) return;
+    els.savingsHead.innerHTML = `
+      <tr>
+        <th>План / факт</th>
+        ${SAVINGS_MONTHS.map(([key, label, year]) => `
+          <th class="num${key === state.currentMonth ? " is-current" : ""}">
+            <span class="col-title">${label}</span>
+            <span class="col-sum">${year}</span>
+          </th>
+        `).join("")}
+      </tr>
+    `;
+    els.savingsBody.innerHTML = "";
+    SAVINGS_ROWS.forEach((row) => {
+      const tr = document.createElement("tr");
+      if (row.calc) tr.classList.add("is-total");
+      const cells = SAVINGS_MONTHS.map(([key]) => {
+        if (row.calc) {
+          const value = savingsCalc(row.calc, key);
+          const tone = row.calc === "delta" && value != null ? (value < 0 ? " delta-neg" : " delta-pos") : "";
+          const shown = value == null ? "—" : formatEditable(value);
+          return `<td class="num"><span class="is-calc${tone}">${shown}</span></td>`;
+        }
+        const value = savingsStored(row.id, key);
+        return `<td class="num"><input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" data-month="${key}" value="${value == null ? "" : formatEditable(value)}" placeholder="—" /></td>`;
+      }).join("");
+      tr.innerHTML = `<td>${escapeAttr(row.name)}</td>${cells}`;
+      tr.querySelectorAll("[data-month]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const id = input.dataset.row;
+          const month = input.dataset.month;
+          const parsed = parseNumber(input.value);
+          if (!state.savingsFact.rows[id]) state.savingsFact.rows[id] = {};
+          if (parsed == null) delete state.savingsFact.rows[id][month];
+          else state.savingsFact.rows[id][month] = parsed;
+          input.value = parsed == null ? "" : formatEditable(parsed);
+          saveState();
+          renderSavings();
+        });
+      });
+      els.savingsBody.appendChild(tr);
+    });
+  }
+
   function paintRemain(node, value) {
     if (!node) return;
     paintText(node, money(value));
@@ -1585,6 +1724,7 @@
     bindWorkdays(month);
     renderIncome(month);
     renderExpenses(month);
+    renderSavings();
     refreshTotalsOnly();
     if (switched) {
       [".sheet-top", ".month-head", ".workdays", ".income-panel", ".expense-panel"].forEach((selector, index) => {
@@ -1617,6 +1757,7 @@
       oklad: state.oklad,
       dailyAverage: state.dailyAverage,
       rentDefaults: state.rentDefaults,
+      savingsFact: state.savingsFact,
       months: state.months,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -1663,6 +1804,7 @@
         ensureRentStructure(next);
         dropKvFromDecember(next);
         ensureTitheStructure(next);
+        if (data.savingsFact && typeof data.savingsFact === "object") next.savingsFact = data.savingsFact;
         if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
         state = next;
         saveState();
@@ -1795,7 +1937,7 @@
         if (month.income.length !== before) droppedVacation = true;
       });
     });
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state)) saveState();
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || ensureSavingsFact(state)) saveState();
     render();
   }
 
