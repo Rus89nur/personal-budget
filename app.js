@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.3.2";
+  const APP_VERSION = "1.3.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -42,7 +42,8 @@
     incomeTotal: document.getElementById("incomeTotal"),
     expenseBody: document.getElementById("expenseBody"),
     expensePlanTotal: document.getElementById("expensePlanTotal"),
-    expenseFactTotal: document.getElementById("expenseFactTotal"),
+    expenseSalaryTotal: document.getElementById("expenseSalaryTotal"),
+    expenseAdvanceTotal: document.getElementById("expenseAdvanceTotal"),
     expenseDeltaTotal: document.getElementById("expenseDeltaTotal"),
     btnAddIncome: document.getElementById("btnAddIncome"),
     btnAddExpense: document.getElementById("btnAddExpense"),
@@ -100,7 +101,7 @@
         { id: uid("exp"), name: "Покупки", plan: 0, fact: null },
         { id: uid("exp"), name: "Отдых", plan: 0, fact: null },
         { id: uid("exp"), name: "Бензин", plan: 0, fact: null },
-        { id: uid("exp"), name: "Баня", plan: 0, fact: null },
+        { id: uid("exp"), name: "Баня", plan: null, salary: 0, advance: null },
       ],
     };
   }
@@ -135,6 +136,48 @@
       };
     }
     return months;
+  }
+
+  function normalizeExpense(row) {
+    if (!("salary" in row)) {
+      const oldPlan = Number(row.plan) || 0;
+      const oldFact = row.fact == null || row.fact === "" ? null : Number(row.fact);
+      row.salary = oldPlan;
+      row.salaryManual = oldPlan !== 0;
+      row.advance = oldFact;
+      row.advanceManual = oldFact != null;
+      row.plan = null;
+      row.planManual = false;
+      delete row.fact;
+    }
+    return row;
+  }
+
+  function inheritExpenses(month, prev) {
+    month.expenses.forEach(normalizeExpense);
+    if (prev) prev.expenses.forEach(normalizeExpense);
+    month.expenses.forEach((row) => {
+      const src = prev && prev.expenses.find(
+        (item) => String(item.name).trim().toLowerCase() === String(row.name).trim().toLowerCase()
+      );
+      if (!src) return;
+      ["plan", "salary", "advance"].forEach((field) => {
+        if (row[`${field}Manual`]) return;
+        row[field] = src[field] == null || src[field] === "" ? null : Number(src[field]) || 0;
+      });
+    });
+  }
+
+  function refreshExpenseDefaults() {
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key, index) => {
+        const month = state.years[year].months[key];
+        const prev = index === 0
+          ? state.years[year - 1]?.months[`${year - 1}-12`]
+          : state.years[year].months[`${year}-${String(index).padStart(2, "0")}`];
+        inheritExpenses(month, prev);
+      });
+    });
   }
 
   function currentMonthKey(year) {
@@ -432,13 +475,14 @@
   function totals(month) {
     const income = month.income.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const plan = month.expenses.reduce((s, r) => s + (Number(r.plan) || 0), 0);
-    const factRows = month.expenses.filter((r) => r.fact != null && r.fact !== "");
-    const fact = factRows.length
-      ? month.expenses.reduce((s, r) => s + (r.fact == null ? 0 : Number(r.fact) || 0), 0)
+    const salary = month.expenses.reduce((s, r) => s + (Number(r.salary) || 0), 0);
+    const advanceRows = month.expenses.filter((r) => r.advance != null && r.advance !== "");
+    const advance = advanceRows.length
+      ? month.expenses.reduce((s, r) => s + (r.advance == null ? 0 : Number(r.advance) || 0), 0)
       : null;
+    const spent = salary + (advance || 0);
     const remain = income - plan;
-    const remainFact = fact == null ? null : income - fact;
-    return { income, plan, fact, remain, remainFact, factCount: factRows.length };
+    return { income, plan, salary, advance, spent, fact: spent, remain };
   }
 
   function renderYearNav() {
@@ -699,10 +743,24 @@
     });
   }
 
+  function expenseDelta(row) {
+    if (row.plan == null && row.salary == null && row.advance == null) return null;
+    const spent = (Number(row.salary) || 0) + (row.advance == null ? 0 : Number(row.advance) || 0);
+    return spent - (Number(row.plan) || 0);
+  }
+
+  function moneyInput(row, field) {
+    const value = row[field];
+    const shown = value == null || value === "" ? "" : formatEditable(value);
+    const tone = row[`${field}Manual`] ? "" : " is-inherited";
+    return `<input class="num-input${tone}" type="text" inputmode="decimal" value="${shown}" placeholder="—" data-field="${field}" />`;
+  }
+
   function renderExpenses(month) {
     els.expenseBody.innerHTML = "";
     month.expenses.forEach((row, index) => {
-      const delta = row.fact == null ? null : (Number(row.fact) || 0) - (Number(row.plan) || 0);
+      normalizeExpense(row);
+      const delta = expenseDelta(row);
       const deltaClass =
         delta == null ? "delta-zero" : delta > 0 ? "delta-neg" : delta < 0 ? "delta-pos" : "delta-zero";
       const tr = document.createElement("tr");
@@ -712,44 +770,41 @@
       }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
-        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.plan)}" data-field="plan" /></td>
-        <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${row.fact == null ? "" : formatEditable(row.fact)}" placeholder="—" data-field="fact" /></td>
+        <td class="num">${moneyInput(row, "plan")}</td>
+        <td class="num">${moneyInput(row, "salary")}</td>
+        <td class="num">${moneyInput(row, "advance")}</td>
         <td class="num ${deltaClass}" data-delta>${delta == null ? "—" : money(delta)}</td>
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
       `;
       const nameInput = tr.querySelector('[data-field="name"]');
-      const planInput = tr.querySelector('[data-field="plan"]');
-      const factInput = tr.querySelector('[data-field="fact"]');
       const deltaCell = tr.querySelector("[data-delta]");
 
       nameInput.addEventListener("change", () => {
         row.name = nameInput.value.trim() || "Прочее";
         state.seeded = false;
         saveState();
+        render();
       });
 
       const syncRow = () => {
-        const d = row.fact == null ? null : (Number(row.fact) || 0) - (Number(row.plan) || 0);
+        const d = expenseDelta(row);
         deltaCell.textContent = d == null ? "—" : money(d);
         deltaCell.className = `num ${d == null ? "delta-zero" : d > 0 ? "delta-neg" : d < 0 ? "delta-pos" : "delta-zero"}`;
         refreshTotalsOnly();
       };
 
-      planInput.addEventListener("change", () => {
-        row.plan = parseNumber(planInput.value) || 0;
-        planInput.value = formatEditable(row.plan);
-        state.seeded = false;
-        saveState();
-        syncRow();
-      });
-
-      factInput.addEventListener("change", () => {
-        const parsed = parseNumber(factInput.value);
-        row.fact = parsed;
-        factInput.value = parsed == null ? "" : formatEditable(parsed);
-        state.seeded = false;
-        saveState();
-        syncRow();
+      ["plan", "salary", "advance"].forEach((field) => {
+        const input = tr.querySelector(`[data-field="${field}"]`);
+        input.addEventListener("change", () => {
+          const parsed = parseNumber(input.value);
+          row[field] = field === "salary" ? parsed || 0 : parsed;
+          row[`${field}Manual`] = true;
+          input.value = row[field] == null ? "" : formatEditable(row[field]);
+          input.classList.remove("is-inherited");
+          state.seeded = false;
+          saveState();
+          syncRow();
+        });
       });
 
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
@@ -768,13 +823,14 @@
     const t = totals(month);
     paintText(els.sumIncome, money(t.income));
     paintText(els.sumPlan, money(t.plan));
-    paintText(els.sumFact, t.fact == null ? "—" : money(t.fact));
+    paintText(els.sumFact, money(t.spent));
     paintText(els.sumRemain, money(t.remain));
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
     paintText(els.expensePlanTotal, money(t.plan));
-    paintText(els.expenseFactTotal, t.fact == null ? "—" : money(t.fact));
-    const deltaTotal = t.fact == null ? null : t.fact - t.plan;
+    paintText(els.expenseSalaryTotal, money(t.salary));
+    paintText(els.expenseAdvanceTotal, t.advance == null ? "—" : money(t.advance));
+    const deltaTotal = t.spent - t.plan;
     els.expenseDeltaTotal.className = `num ${
       deltaTotal == null ? "delta-zero" : deltaTotal > 0 ? "delta-neg" : deltaTotal < 0 ? "delta-pos" : "delta-zero"
     }`;
@@ -793,6 +849,7 @@
       : "Данные хранятся только в этом браузере";
     renderYearNav();
     renderMonthNav();
+    refreshExpenseDefaults();
     bindWorkdays(month);
     renderIncome(month);
     renderExpenses(month);
@@ -899,7 +956,13 @@
   });
 
   els.btnAddExpense.addEventListener("click", () => {
-    activeMonth().expenses.push({ id: uid("exp"), name: "Прочее", plan: 0, fact: null });
+    activeMonth().expenses.push({
+      id: uid("exp"),
+      name: "Прочее",
+      plan: null,
+      salary: null,
+      advance: null,
+    });
     state.seeded = false;
     saveState();
     render();
