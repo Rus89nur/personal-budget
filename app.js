@@ -1,4 +1,5 @@
 (() => {
+  const APP_VERSION = "1.1.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEAR = 2026;
   const Salary = window.BudgetSalary;
@@ -652,6 +653,29 @@
     e.target.value = "";
   });
 
+  function watchForUpdate() {
+    const badge = document.querySelector(".app-version");
+    if (badge) badge.textContent = APP_VERSION;
+
+    const check = async () => {
+      try {
+        const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const remote = String(data.version || "");
+        if (!remote || remote === APP_VERSION) return;
+        const next = new URL(location.href);
+        next.searchParams.set("v", remote);
+        location.replace(next.toString());
+      } catch {
+        /* следующая проверка повторит запрос */
+      }
+    };
+
+    check();
+    setInterval(check, 20000);
+  }
+
   async function boot() {
     try {
       const res = await fetch("./seed-data.json", { cache: "no-store" });
@@ -667,5 +691,6 @@
     render();
   }
 
+  watchForUpdate();
   boot();
 })();
