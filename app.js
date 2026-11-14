@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.8.1";
+  const APP_VERSION = "1.8.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1696,14 +1696,10 @@
   function renderSavings() {
     if (!els.savingsHead || !els.savingsBody || !state.savingsFact) return;
     const key = state.currentMonth;
-    const prevKey = previousMonthKey(key);
     els.savingsHead.innerHTML = `
       <tr>
         <th><span class="col-title">Строка</span></th>
-        <th class="num"><span class="col-title">${escapeAttr(monthChip(prevKey))}</span></th>
         <th class="num"><span class="col-title">${escapeAttr(monthChip(key))}</span></th>
-        <th class="num"><span class="col-title">Разница</span></th>
-        <th class="num"><span class="col-title">%</span></th>
       </tr>
     `;
     els.savingsBody.innerHTML = "";
@@ -1711,17 +1707,12 @@
       const tr = document.createElement("tr");
       if (row.calc) tr.classList.add("is-total");
       const current = row.calc ? savingsCalc(row.calc, key) : savingsStored(row.id, key);
-      const previous = row.calc ? savingsCalc(row.calc, prevKey) : savingsStored(row.id, prevKey);
-      const view = compareView(current, previous);
       const currentCell = row.calc
-        ? readCell(view.currentText)
+        ? readCell(current == null ? "" : formatEditable(current))
         : `<input class="num-input" type="text" inputmode="decimal" data-blank="1" data-row="${row.id}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" />`;
       tr.innerHTML = `
         <td>${nameCell(row.name)}</td>
-        <td class="num">${readCell(view.prevText)}</td>
         <td class="num">${currentCell}</td>
-        <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
-        <td class="num">${readCell(view.percentText, view.percentTone)}</td>
       `;
       const input = tr.querySelector("input:not([readonly])");
       if (input) {
