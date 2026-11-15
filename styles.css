@@ -1150,18 +1150,20 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   color: var(--expense);
 }
 
-.expense-panel .unallocated-row td {
-  background: rgba(31, 77, 74, 0.07);
+.unallocated-corner {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
-.expense-panel .unallocated-label,
-.expense-panel .unallocated-value {
-  font-weight: 650;
-  color: var(--ink-soft);
+.unallocated-corner strong {
+  font-weight: 700;
+  color: var(--ink);
 }
 
-.expense-panel .unallocated-value.delta-neg {
+.unallocated-corner.delta-neg strong {
   color: var(--expense);
 }
 
