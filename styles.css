@@ -1117,12 +1117,18 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   color: rgba(28, 27, 25, 0.45);
 }
 
-.expense-panel .data-table input.plan-short {
-  color: #9a6424;
+.expense-panel .data-table input.plan-short,
+.expense-panel .data-table input.plan-short:hover,
+.expense-panel .data-table input.plan-short:focus {
+  color: var(--expense);
+  font-weight: 700;
 }
 
-.expense-panel .data-table input.plan-over {
-  color: var(--expense);
+.expense-panel .data-table input.plan-over,
+.expense-panel .data-table input.plan-over:hover,
+.expense-panel .data-table input.plan-over:focus {
+  color: var(--income);
+  font-weight: 700;
 }
 
 .expense-panel #expenseFoot th {
