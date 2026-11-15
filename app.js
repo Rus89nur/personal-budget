@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.21.2";
+  const APP_VERSION = "1.21.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -848,6 +848,48 @@
       if (Array.isArray(row.lines)) copy.lines = cloneRentLines(row.lines);
     }
     return copy;
+  }
+
+  function copyExpenseRow(row) {
+    const source = {
+      ...row,
+      shares: { ...(row.shares || {}) },
+      sharesManual: { ...(row.sharesManual || {}) },
+    };
+    normalizeExpense(source);
+    const plan = source.plan == null || source.plan === "" ? null : Number(source.plan);
+    return {
+      id: source.id || uid("exp"),
+      name: String(source.name || "Прочее"),
+      plan: Number.isFinite(plan) ? plan : null,
+      planManual: Boolean(source.planManual),
+      shares: source.shares,
+      sharesManual: source.sharesManual,
+    };
+  }
+
+  function copyMonthState(src) {
+    if (!src || typeof src !== "object") return emptyMonth();
+    return {
+      workdays: { ...(src.workdays || {}) },
+      income: (src.income || []).map(copyIncomeRow),
+      expenses: (src.expenses || [])
+        .filter((row) => row && row.name && expenseNameKey(row.name) !== "остаток")
+        .map(copyExpenseRow),
+    };
+  }
+
+  function installImportedYear(target, year, months) {
+    rememberYear(year);
+    if (!target.years[year]) target.years[year] = { months: {} };
+    Object.entries(months || {}).forEach(([key, month]) => {
+      if (!/^\d{4}-\d{2}$/.test(key) || yearOf(key) !== year) return;
+      target.years[year].months[key] = copyMonthState(month);
+    });
+    monthKeys(year).forEach((key, index) => {
+      if (!target.years[year].months[key]) target.years[year].months[key] = emptyMonth();
+      stampWorkdays(target.years[year].months[key], year, index);
+    });
   }
 
   function rentTotal(lines) {
@@ -2932,8 +2974,9 @@
 
   function exportData() {
     const payload = {
-      version: 2,
+      version: 3,
       year: state.year,
+      currentMonth: state.currentMonth,
       source: "Бюджет",
       exportedAt: new Date().toISOString(),
       oklad: state.oklad,
@@ -2941,7 +2984,11 @@
       rentDefaults: state.rentDefaults,
       savingsFact: state.savingsFact,
       utilities: state.utilities,
+      years: state.years,
       months: state.months,
+      sheetNovemberCosts: state.sheetNovemberCosts,
+      sheetBudgetThrough: state.sheetBudgetThrough,
+      sheetSavingsFact: state.sheetSavingsFact,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2958,38 +3005,49 @@
       try {
         const data = JSON.parse(String(reader.result));
         if (!data || typeof data !== "object") throw new Error("bad");
-        const months = data.months || data;
-        if (!months || typeof months !== "object") throw new Error("bad months");
-        const next = buildStateFromSeed({ months }, false);
-        if (Number.isFinite(Number(data.oklad)) && Number(data.oklad) > 0) {
-          next.oklad = Number(data.oklad);
+        const hasYears = data.years && typeof data.years === "object";
+        const hasMonths = data.months && typeof data.months === "object";
+        if (!hasYears && !hasMonths) throw new Error("bad months");
+        const next = buildStateFromSeed(seedTemplate || {}, false);
+        delete next.needsPayroll;
+        if (Number.isFinite(Number(data.oklad)) && Number(data.oklad) > 0) next.oklad = Number(data.oklad);
+        if (Number.isFinite(Number(data.dailyAverage)) && Number(data.dailyAverage) >= 0) {
+          next.dailyAverage = Number(data.dailyAverage);
         }
         if (Array.isArray(data.rentDefaults)) next.rentDefaults = cloneRentLines(data.rentDefaults);
-        for (const key of monthKeys()) {
-          if (months[key]) {
-            const src = months[key];
-            next.months[key] = {
-              workdays: {
-                total: src.workdays?.total ?? null,
-                worked: src.workdays?.worked ?? null,
-                vacation: src.workdays?.vacation ?? null,
-              },
-              income: (src.income || []).map(copyIncomeRow),
-              expenses: (src.expenses || []).map((row) => ({
-                id: row.id || uid("exp"),
-                name: String(row.name || "Прочее"),
-                plan: Number(row.plan) || 0,
-                fact: row.fact == null || row.fact === "" ? null : Number(row.fact),
-              })),
-            };
-          }
+        if (hasYears) {
+          Object.keys(data.years).forEach((key) => {
+            const year = Number(key);
+            if (!Number.isInteger(year)) return;
+            installImportedYear(next, year, data.years[key]?.months);
+          });
+        } else {
+          const grouped = {};
+          Object.keys(data.months).forEach((key) => {
+            if (!/^\d{4}-\d{2}$/.test(key)) return;
+            const year = yearOf(key);
+            if (!grouped[year]) grouped[year] = {};
+            grouped[year][key] = data.months[key];
+          });
+          Object.keys(grouped).forEach((key) => installImportedYear(next, Number(key), grouped[key]));
         }
+        if (data.savingsFact && typeof data.savingsFact === "object") next.savingsFact = data.savingsFact;
+        if (data.utilities && typeof data.utilities === "object") next.utilities = data.utilities;
+        next.sheetNovemberCosts = data.sheetNovemberCosts || "2026-11";
+        next.sheetBudgetThrough = data.sheetBudgetThrough || "2026-10";
+        next.sheetSavingsFact = data.sheetSavingsFact || "2026";
         ensureRentStructure(next);
         dropKvFromDecember(next);
         ensureTitheStructure(next);
-        if (data.savingsFact && typeof data.savingsFact === "object") next.savingsFact = data.savingsFact;
-        if (data.utilities && typeof data.utilities === "object") next.utilities = data.utilities;
-        if (!confirm("Импортировать бюджет? Текущие данные за этот год будут заменены.")) return;
+        const importedYear = Number(data.year);
+        const year = next.years[importedYear] ? importedYear : Number(Object.keys(next.years)[0]);
+        attachYear(next, year);
+        if (data.currentMonth && next.years[yearOf(data.currentMonth)]?.months?.[data.currentMonth]) {
+          next.year = yearOf(data.currentMonth);
+          next.currentMonth = data.currentMonth;
+          next.months = next.years[next.year].months;
+        }
+        if (!confirm("Импортировать бюджет? Текущие данные на этом устройстве будут заменены.")) return;
         state = next;
         saveState();
         render();
