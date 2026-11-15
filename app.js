@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.22.1";
+  const APP_VERSION = "1.22.2";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1133,12 +1133,14 @@
       check.addEventListener("change", () => patchRentLine(key, line.id, { active: check.checked }));
       name.addEventListener("change", () => patchRentLine(key, line.id, { label: name.value }));
       amount.addEventListener("change", () => patchRentLine(key, line.id, { amount: parseNumber(amount.value) || 0 }));
+      armNoSelect(amount);
       amount.addEventListener("dblclick", (event) => {
         event.preventDefault();
         const current = monthByKey(key)?.income?.find(isRentRow);
         if (!current || !toggleRentLinePaid(current, line.id)) return;
         state.seeded = false;
         saveState();
+        releaseSelection(amount);
         renderRentMenu();
         paintRentRow();
         renderIncome(monthByKey(state.currentMonth));
@@ -1350,6 +1352,25 @@
       return;
     }
     run();
+  }
+
+  function armNoSelect(input) {
+    input.addEventListener("mousedown", (event) => {
+      if (event.detail > 1 && String(input.value || "").trim()) event.preventDefault();
+    });
+  }
+
+  function releaseSelection(input) {
+    const drop = () => {
+      if (input instanceof HTMLInputElement && typeof input.setSelectionRange === "function") {
+        const end = input.value.length;
+        try { input.setSelectionRange(end, end); } catch (e) {}
+      }
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount) selection.removeAllRanges();
+    };
+    drop();
+    window.setTimeout(drop, 0);
   }
 
   function scrollFieldIntoView(el) {
@@ -1740,6 +1761,7 @@
           clearTimeout(rentOpenTimer);
           rentOpenTimer = setTimeout(openRentMenu, 240);
         });
+        armNoSelect(rentAmount);
         rentAmount.addEventListener("dblclick", (event) => {
           event.preventDefault();
           clearTimeout(rentOpenTimer);
@@ -1750,6 +1772,7 @@
             : "Нажмите, чтобы изменить. Двойное нажатие отмечает, что квартплата внесена";
           state.seeded = false;
           saveState();
+          releaseSelection(rentAmount);
           if (els.rentDialog.open) renderRentMenu();
         });
         els.incomeBody.appendChild(tr);
@@ -1952,8 +1975,9 @@
           paintSettled(input, expenseSettled(row, key));
           state.seeded = false;
           saveState();
-          selectField(input);
+          releaseSelection(input);
         });
+        armNoSelect(input);
 
         input.addEventListener("focus", () => {
           if (cellValue(row, key) != null) return;
@@ -2410,8 +2434,9 @@
           toggleSavingsSettled(row.id, monthKey);
           paintSettled(input, savingsIsSettled(row.id, monthKey));
           saveState();
-          selectField(input);
+          releaseSelection(input);
         });
+        armNoSelect(input);
       });
     });
     renderBrokerIncomes(months);
@@ -2480,8 +2505,9 @@
           toggleBrokerSettled(row.id, monthKey);
           paintSettled(input, brokerIsSettled(row.id, monthKey));
           saveState();
-          selectField(input);
+          releaseSelection(input);
         });
+        armNoSelect(input);
       });
     });
   }
@@ -2577,6 +2603,37 @@
     return n > 0 ? " utility-up" : " utility-down";
   }
 
+  function utilityIsSettled(id, monthKey) {
+    return Boolean(state.utilities?.settled?.[id]?.[monthKey]);
+  }
+
+  function toggleUtilitySettled(id, monthKey) {
+    if (!state.utilities.settled) state.utilities.settled = {};
+    if (!state.utilities.settled[id]) state.utilities.settled[id] = {};
+    if (state.utilities.settled[id][monthKey]) delete state.utilities.settled[id][monthKey];
+    else state.utilities.settled[id][monthKey] = true;
+  }
+
+  function clearUtilitySettled(id, monthKey) {
+    if (state.utilities?.settled?.[id]) delete state.utilities.settled[id][monthKey];
+  }
+
+  function utilityAmountCell(id, monthKey, value, editable) {
+    const shown = value == null ? "" : formatEditable(value);
+    if (value == null) {
+      return editable
+        ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${id}" data-month="${monthKey}" value="" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
+        : readCell("");
+    }
+    const settled = utilityIsSettled(id, monthKey);
+    const title = ` title="${escapeAttr(settledTitle(settled))}"`;
+    const cls = settled ? " is-settled" : "";
+    if (!editable) {
+      return `<input class="num-input${cls}" type="text" readonly data-settle="1" data-util="${id}" data-month="${monthKey}" value="${escapeAttr(shown)}"${title} />`;
+    }
+    return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${id}" data-util="${id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
+  }
+
   function renderUtilities() {
     if (!els.utilitiesHead || !els.utilitiesBody || !state.utilities) return;
     const inputKey = previousMonthKey(state.currentMonth);
@@ -2597,27 +2654,41 @@
       const current = valueOf(inputKey);
       const previous = valueOf(compareKey);
       const view = compareView(current, previous);
-      const currentCell = editableId
-        ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${editableId}" value="${current == null ? "" : formatEditable(current)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
-        : readCell(view.currentText);
+      const rowId = editableId || "total";
       tr.innerHTML = `
         <td>${utilityNameCell(title)}</td>
-        <td class="num plan-col">${readCell(view.prevText)}</td>
-        <td class="num is-entry">${currentCell}</td>
+        <td class="num plan-col">${utilityAmountCell(rowId, compareKey, previous, false)}</td>
+        <td class="num is-entry">${utilityAmountCell(rowId, inputKey, current, Boolean(editableId))}</td>
         <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
         <td class="num">${readCell(view.percentText, view.percentTone)}</td>
       `;
-      const input = tr.querySelector("input:not([readonly])");
+      const input = tr.querySelector("input[data-row]:not([readonly])");
       if (input) {
         input.addEventListener("change", () => {
           const parsed = parseNumber(input.value);
           if (!state.utilities.rows[editableId]) state.utilities.rows[editableId] = {};
-          if (parsed == null) delete state.utilities.rows[editableId][inputKey];
-          else state.utilities.rows[editableId][inputKey] = parsed;
+          if (parsed == null) {
+            delete state.utilities.rows[editableId][inputKey];
+            clearUtilitySettled(editableId, inputKey);
+          } else state.utilities.rows[editableId][inputKey] = parsed;
           saveState();
           renderUtilities();
         });
       }
+      tr.querySelectorAll("input[data-settle]").forEach((cell) => {
+        armNoSelect(cell);
+        cell.addEventListener("dblclick", (event) => {
+          const id = cell.dataset.util;
+          const monthKey = cell.dataset.month;
+          const amount = id === "total" ? utilityTotal(monthKey) : utilityStored(id, monthKey);
+          if (amount == null) return;
+          event.preventDefault();
+          toggleUtilitySettled(id, monthKey);
+          paintSettled(cell, utilityIsSettled(id, monthKey));
+          saveState();
+          releaseSelection(cell);
+        });
+      });
       els.utilitiesBody.appendChild(tr);
     };
     UTILITY_ROWS.forEach((row) => paintRow(row.name, (month) => utilityStored(row.id, month), row.id));
