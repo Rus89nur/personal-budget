@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.27.2";
+  const APP_VERSION = "1.28.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2095,6 +2095,15 @@
       </tr>
     `;
     els.expenseBody.innerHTML = "";
+    const unallocated = document.createElement("tr");
+    unallocated.className = "unallocated-row";
+    unallocated.innerHTML = `
+      <td class="unallocated-label">Нераспределено</td>
+      <td class="num plan-col unallocated-value" data-open="plan"></td>
+      ${columns.map((col) => `<td class="num unallocated-value" data-open-id="${escapeAttr(col.id)}"></td>`).join("")}
+      <td class="actions-col"></td>
+    `;
+    els.expenseBody.appendChild(unallocated);
     month.expenses.forEach((row, index) => {
       normalizeExpense(row);
       const tr = document.createElement("tr");
@@ -2247,13 +2256,16 @@
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
     paintText(document.querySelector('#expenseHead [data-sum="plan"]'), money(t.income));
-    paintRemain(document.querySelector('#expenseFoot [data-remain="plan"]'), t.income - t.plan);
+    const planLeft = t.income - t.plan;
+    paintRemain(document.querySelector('#expenseFoot [data-remain="plan"]'), planLeft);
+    paintRemain(document.querySelector('#expenseBody [data-open="plan"]'), planLeft);
     month.income.forEach((row) => {
       const head = document.querySelector(`#expenseHead [data-income-id="${CSS.escape(row.id)}"]`);
       const amount = Number(row.amount) || 0;
       if (head) paintText(head, money(amount));
-      const left = document.querySelector(`#expenseFoot [data-remain-id="${CSS.escape(row.id)}"]`);
-      paintRemain(left, amount - columnSum(month, incomeColumnKey(row)));
+      const leftAmount = amount - columnSum(month, incomeColumnKey(row));
+      paintRemain(document.querySelector(`#expenseFoot [data-remain-id="${CSS.escape(row.id)}"]`), leftAmount);
+      paintRemain(document.querySelector(`#expenseBody [data-open-id="${CSS.escape(row.id)}"]`), leftAmount);
     });
     paintPlanShortfalls(month);
     paintSetAsideHint();
