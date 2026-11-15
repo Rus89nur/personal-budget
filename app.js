@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.22.0";
+  const APP_VERSION = "1.22.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2336,13 +2336,16 @@
   function savingsCell(row, monthKey, editable) {
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
-    if (row.calc || value == null) return readCell(shown);
-    const settled = savingsIsSettled(row.id, monthKey);
-    const title = ` title="${escapeAttr(settledTitle(settled))}"`;
-    const cls = settled ? " is-settled" : "";
-    if (!editable) {
+    if (row.calc || !editable) {
+      if (row.calc || value == null) return readCell(shown);
+      const settled = savingsIsSettled(row.id, monthKey);
+      const title = ` title="${escapeAttr(settledTitle(settled))}"`;
+      const cls = settled ? " is-settled" : "";
       return `<input class="num-input${cls}" type="text" readonly data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}"${title} />`;
     }
+    const settled = value != null && savingsIsSettled(row.id, monthKey);
+    const title = value == null ? "" : ` title="${escapeAttr(settledTitle(settled))}"`;
+    const cls = settled ? " is-settled" : "";
     return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
@@ -2436,11 +2439,11 @@
           const settled = shown !== "" && brokerIsSettled(row.id, month.key);
           const title = shown === "" ? "" : ` title="${escapeAttr(settledTitle(settled))}"`;
           const cls = settled ? " is-settled" : "";
-          const cell = shown === ""
-            ? readCell(shown)
-            : month.editable
-              ? `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`
-              : `<input class="num-input${cls}" type="text" readonly data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}"${title} />`;
+          const cell = !month.editable
+            ? (shown === ""
+              ? readCell(shown)
+              : `<input class="num-input${cls}" type="text" readonly data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}"${title} />`)
+            : `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
           return `<td class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}">${cell}</td>`;
         }).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
