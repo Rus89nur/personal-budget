@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.28.0";
+  const APP_VERSION = "1.28.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1203,9 +1203,21 @@
     sum.textContent = money(rentTotal(row.lines));
   }
 
-  function appendRentDetail() {
+  function paintRentToggleHint() {
+    const row = document.querySelector("#incomeBody .rent-row");
+    if (!row) return;
+    row.classList.toggle("is-open", rentExpanded);
+    const hint = rentExpanded ? "Нажмите, чтобы скрыть" : "Нажмите, чтобы раскрыть";
+    const name = row.querySelector("[data-act=rent]");
+    if (name) name.title = hint;
+    const hintEl = row.querySelector(".rent-hint");
+    if (hintEl) hintEl.textContent = hint;
+  }
+
+  function appendRentDetail(instant) {
     const detail = document.createElement("tr");
     detail.className = "rent-detail";
+    if (instant) detail.classList.add("is-instant");
     detail.innerHTML = `
       <td colspan="3">
         <div class="rent-fold">
@@ -1221,11 +1233,51 @@
       </td>
     `;
     detail.querySelector("#rentAdd").addEventListener("click", () => addRentLine(state.currentMonth));
-    els.incomeBody.appendChild(detail);
+    const rentRow = document.querySelector("#incomeBody .rent-row");
+    if (rentRow) rentRow.after(detail);
+    else els.incomeBody.appendChild(detail);
     renderRentMenu();
+    if (instant) return;
+    const fold = detail.querySelector(".rent-fold");
+    const target = fold.scrollHeight;
+    fold.style.height = "0px";
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => detail.classList.add("is-shown"));
+      requestAnimationFrame(() => {
+        fold.style.height = `${target}px`;
+        fold.style.opacity = "1";
+        fold.style.transform = "translateY(0)";
+      });
     });
+    fold.addEventListener("transitionend", (event) => {
+      if (event.propertyName !== "height" || event.target !== fold) return;
+      if (detail.isConnected && !detail.classList.contains("is-closing")) fold.style.height = "auto";
+    });
+  }
+
+  function collapseRentDetail(detail) {
+    const fold = detail.querySelector(".rent-fold");
+    if (!fold) {
+      detail.remove();
+      return;
+    }
+    detail.classList.add("is-closing");
+    detail.classList.remove("is-instant");
+    fold.style.height = `${fold.getBoundingClientRect().height}px`;
+    fold.style.opacity = "1";
+    fold.offsetHeight;
+    fold.style.height = "0px";
+    fold.style.opacity = "0";
+    fold.style.transform = "translateY(-6px)";
+    let closed = false;
+    const finish = () => {
+      if (closed || rentExpanded) return;
+      closed = true;
+      detail.remove();
+    };
+    fold.addEventListener("transitionend", (event) => {
+      if (event.propertyName === "height") finish();
+    });
+    window.setTimeout(finish, 520);
   }
 
   function toggleRentDetail() {
@@ -1233,26 +1285,26 @@
     if (rentExpanded && detail) {
       rentExpanded = false;
       rentMenuKey = null;
-      detail.classList.remove("is-shown");
-      let closed = false;
-      const finish = () => {
-        if (closed || rentExpanded) return;
-        closed = true;
-        renderIncome(activeMonth());
-      };
-      detail.addEventListener("transitionend", finish, { once: true });
-      window.setTimeout(finish, 460);
+      paintRentToggleHint();
+      collapseRentDetail(detail);
       return;
     }
     rentExpanded = true;
     rentMenuKey = state.currentMonth;
-    renderIncome(activeMonth());
+    paintRentToggleHint();
+    appendRentDetail(false);
   }
 
   function closeRentMenu() {
     if (!rentExpanded) return;
     rentExpanded = false;
     rentMenuKey = null;
+    const detail = document.querySelector("#incomeBody .rent-detail");
+    if (detail) {
+      paintRentToggleHint();
+      collapseRentDetail(detail);
+      return;
+    }
     renderIncome(activeMonth());
   }
 
@@ -1928,7 +1980,7 @@
           if (rentExpanded) renderRentMenu();
         }, toggleRentDetail);
         els.incomeBody.appendChild(tr);
-        if (rentExpanded) appendRentDetail();
+        if (rentExpanded) appendRentDetail(true);
         return;
       }
       if (isBrokerLabel(row.label)) {

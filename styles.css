@@ -1495,25 +1495,24 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 }
 
 .rent-fold {
-  display: grid;
-  grid-template-rows: 0fr;
+  height: 0;
+  overflow: hidden;
   opacity: 0;
   transform: translateY(-6px);
   transition:
-    grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.32s ease,
-    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    height 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.35s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.rent-detail.is-shown .rent-fold {
-  grid-template-rows: 1fr;
+.rent-detail.is-instant .rent-fold {
+  height: auto;
   opacity: 1;
   transform: none;
+  transition: none;
 }
 
 .rent-fold-inner {
-  min-height: 0;
-  overflow: hidden;
   padding: 0.2rem 0 0.85rem;
 }
 
