@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.27.0";
+  const APP_VERSION = "1.27.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1188,13 +1188,11 @@
       name.addEventListener("change", () => patchRentLine(key, line.id, { label: name.value }));
       amount.addEventListener("change", () => patchRentLine(key, line.id, { amount: parseNumber(amount.value) || 0 }));
       armNoSelect(amount);
-      amount.addEventListener("dblclick", (event) => {
-        event.preventDefault();
+      holdToSettle(amount, () => {
         const current = monthByKey(key)?.income?.find(isRentRow);
-        if (!current || !toggleRentLinePaid(current, line.id)) return;
+        if (!current || !toggleRentLinePaid(current, line.id)) return false;
         state.seeded = false;
         saveState();
-        releaseSelection(amount);
         renderRentMenu();
         paintRentRow();
         renderIncome(monthByKey(state.currentMonth));
@@ -1217,7 +1215,7 @@
               <button type="button" class="btn btn-small" id="rentAdd">+ строка</button>
               <span>В доходе <strong id="rentSum">0 ₽</strong></span>
             </div>
-            <p class="rent-detail-note">Правка действует на этот месяц и все следующие. Двойное нажатие по сумме отмечает, что она внесена.</p>
+            <p class="rent-detail-note">Правка действует на этот месяц и все следующие. Удержите сумму, чтобы отметить, что она внесена.</p>
           </div>
         </div>
       </td>
@@ -1439,6 +1437,86 @@
     input.addEventListener("mousedown", (event) => {
       if (event.detail > 1 && String(input.value || "").trim()) event.preventDefault();
     });
+  }
+
+  function canHoldSettle(input) {
+    const value = String(input.value || "").trim();
+    return value !== "" && value !== "—";
+  }
+
+  function holdToSettle(input, action, onShortTap) {
+    let timer = 0;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    const clear = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = 0;
+      input.classList.remove("is-holding");
+    };
+
+    input.addEventListener("touchstart", (event) => {
+      if (!canHoldSettle(input) || event.touches.length !== 1) return;
+      event.preventDefault();
+    }, { passive: false });
+
+    input.addEventListener("pointerdown", (event) => {
+      if (event.button != null && event.button !== 0) return;
+      if (!canHoldSettle(input)) return;
+      tracking = true;
+      startX = event.clientX;
+      startY = event.clientY;
+      clear();
+      input.classList.add("is-holding");
+      timer = window.setTimeout(() => {
+        timer = 0;
+        tracking = false;
+        input.classList.remove("is-holding");
+        input.dataset.held = "1";
+        if (action() === false) {
+          delete input.dataset.held;
+          return;
+        }
+        releaseSelection(input);
+        input.blur();
+      }, 480);
+    });
+
+    input.addEventListener("pointermove", (event) => {
+      if (!timer) return;
+      if (Math.abs(event.clientX - startX) > 10 || Math.abs(event.clientY - startY) > 10) clear();
+    });
+
+    input.addEventListener("pointerup", (event) => {
+      const pending = Boolean(timer);
+      clear();
+      if (!tracking) return;
+      tracking = false;
+      if (!pending) return;
+      if (onShortTap) {
+        input.dataset.held = "1";
+        onShortTap();
+        return;
+      }
+      if (event.pointerType !== "mouse" && !input.readOnly) input.focus({ preventScroll: true });
+    });
+
+    input.addEventListener("pointercancel", () => {
+      clear();
+      tracking = false;
+    });
+
+    input.addEventListener("contextmenu", (event) => {
+      if (canHoldSettle(input)) event.preventDefault();
+    });
+
+    input.addEventListener("click", (event) => {
+      if (input.dataset.held !== "1") return;
+      delete input.dataset.held;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
   }
 
   function releaseSelection(input) {
@@ -1833,31 +1911,22 @@
             <input class="name-input" type="text" value="Аренда" data-act="rent" readonly title="${rentHint}" />
             <span class="rent-hint">${rentHint}</span>
           </td>
-          <td class="num"><input class="num-input${rentIsPaid(row) ? " is-settled" : ""}" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="${escapeAttr(rentIsPaid(row) ? "Квартплата внесена. Двойное нажатие снимет отметку" : "Нажмите, чтобы раскрыть. Двойное нажатие отмечает, что квартплата внесена")}" /></td>
+          <td class="num"><input class="num-input${rentIsPaid(row) ? " is-settled" : ""}" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="${escapeAttr(rentIsPaid(row) ? "Квартплата внесена. Удержите, чтобы снять отметку" : "Нажмите, чтобы раскрыть. Удержите, чтобы отметить, что квартплата внесена")}" /></td>
           <td class="actions-col"></td>
         `;
         tr.querySelector("[data-act=rent]").addEventListener("click", toggleRentDetail);
         const rentAmount = tr.querySelector("[data-rent-amount]");
-        let rentOpenTimer = 0;
-        rentAmount.addEventListener("click", (event) => {
-          if (event.detail > 1) return;
-          clearTimeout(rentOpenTimer);
-          rentOpenTimer = setTimeout(toggleRentDetail, 240);
-        });
         armNoSelect(rentAmount);
-        rentAmount.addEventListener("dblclick", (event) => {
-          event.preventDefault();
-          clearTimeout(rentOpenTimer);
-          if (!toggleRentPaid(row)) return;
+        holdToSettle(rentAmount, () => {
+          if (!toggleRentPaid(row)) return false;
           paintSettled(rentAmount, rentIsPaid(row));
           rentAmount.title = rentIsPaid(row)
-            ? "Квартплата внесена. Двойное нажатие снимет отметку"
-            : "Нажмите, чтобы изменить. Двойное нажатие отмечает, что квартплата внесена";
+            ? "Квартплата внесена. Удержите, чтобы снять отметку"
+            : "Нажмите, чтобы раскрыть. Удержите, чтобы отметить, что квартплата внесена";
           state.seeded = false;
           saveState();
-          releaseSelection(rentAmount);
           if (rentExpanded) renderRentMenu();
-        });
+        }, toggleRentDetail);
         els.incomeBody.appendChild(tr);
         if (rentExpanded) appendRentDetail();
         return;
@@ -1918,8 +1987,8 @@
 
   function settledTitle(on) {
     return on
-      ? "Внесено. Двойное нажатие снимет отметку"
-      : "Двойное нажатие отмечает, что сумма уже внесена";
+      ? "Внесено. Удержите, чтобы снять отметку"
+      : "Удержите, чтобы отметить, что сумма уже внесена";
   }
 
   function expenseSettled(row, key) {
@@ -2067,13 +2136,11 @@
           refreshTotalsOnly();
         };
 
-        input.addEventListener("dblclick", (event) => {
-          if (!toggleExpenseSettled(row, key)) return;
-          event.preventDefault();
+        holdToSettle(input, () => {
+          if (!toggleExpenseSettled(row, key)) return false;
           paintSettled(input, expenseSettled(row, key));
           state.seeded = false;
           saveState();
-          releaseSelection(input);
         });
         armNoSelect(input);
 
@@ -2672,14 +2739,12 @@
         paintOwnInputs();
         paintSavingsCalcs();
       });
-      input.addEventListener("dblclick", (event) => {
+      holdToSettle(input, () => {
         const monthKey = input.dataset.month;
-        if (savingsValue(row, monthKey) == null) return;
-        event.preventDefault();
+        if (savingsValue(row, monthKey) == null) return false;
         toggleSavingsSettled(row.id, monthKey);
         paintSettled(input, savingsIsSettled(row.id, monthKey));
         saveState();
-        releaseSelection(input);
       });
       armNoSelect(input);
     });
@@ -2767,15 +2832,13 @@
       });
       els.savingsBody.appendChild(tr);
       tr.querySelectorAll("input[data-settle]").forEach((input) => {
-        input.addEventListener("dblclick", (event) => {
+        holdToSettle(input, () => {
           const monthKey = input.dataset.month;
           const value = row.amounts[monthKey];
-          if (value == null || value === "") return;
-          event.preventDefault();
+          if (value == null || value === "") return false;
           toggleBrokerSettled(row.id, monthKey);
           paintSettled(input, brokerIsSettled(row.id, monthKey));
           saveState();
-          releaseSelection(input);
         });
         armNoSelect(input);
       });
@@ -2957,16 +3020,14 @@
       }
       tr.querySelectorAll("input[data-settle]").forEach((cell) => {
         armNoSelect(cell);
-        cell.addEventListener("dblclick", (event) => {
+        holdToSettle(cell, () => {
           const id = cell.dataset.util;
           const monthKey = cell.dataset.month;
           const amount = id === "total" ? utilityTotal(monthKey) : utilityStored(id, monthKey);
-          if (amount == null) return;
-          event.preventDefault();
+          if (amount == null) return false;
           toggleUtilitySettled(id, monthKey);
           paintSettled(cell, utilityIsSettled(id, monthKey));
           saveState();
-          releaseSelection(cell);
         });
       });
       els.utilitiesBody.appendChild(tr);

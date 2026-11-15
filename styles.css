@@ -962,6 +962,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   min-width: 6.2rem;
 }
 
+.data-table input.num-input.is-holding {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .expense-panel .data-table {
   border-collapse: separate;
   border-spacing: 0 0.35rem;
