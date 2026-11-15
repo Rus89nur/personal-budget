@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.23.0";
+  const APP_VERSION = "1.24.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2095,6 +2095,7 @@
     });
     paintPlanShortfalls(month);
     paintSetAsideHint();
+    paintSavingsCalcs();
   }
 
   const SAVINGS_ROWS = [
@@ -2244,6 +2245,39 @@
     return savingsRound(parts.reduce((sum, value) => sum + value, 0));
   }
 
+  function ownShareSkipped(key) {
+    const label = String(key || "").replace(/^name:/, "").toLowerCase();
+    return /аренд/.test(label) || /брокер/.test(label);
+  }
+
+  function ownFromSetAside(key) {
+    const month = state.years?.[yearOf(key)]?.months?.[key];
+    if (!month?.expenses) return null;
+    let sum = 0;
+    let found = false;
+    month.expenses.forEach((row) => {
+      if (!isSetAsideRow(row)) return;
+      normalizeExpense(row);
+      Object.keys(row.shares || {}).forEach((col) => {
+        if (ownShareSkipped(col)) return;
+        const value = cellValue(row, col);
+        if (value == null) return;
+        sum += value;
+        found = true;
+      });
+    });
+    return found ? savingsRound(sum) : null;
+  }
+
+  function ownIsManual(key) {
+    return Boolean(state.savingsFact?.ownManual?.[key]);
+  }
+
+  function ownAmount(key) {
+    if (ownIsManual(key)) return savingsStored("own", key);
+    return ownFromSetAside(key);
+  }
+
   function setAsideForMonth(key) {
     const month = state.years?.[yearOf(key)]?.months?.[key];
     if (!month?.expenses) return null;
@@ -2290,7 +2324,7 @@
 
   function savingsTopup(key) {
     const earned = savingsEarned(key);
-    const own = setAsideForMonth(key);
+    const own = ownAmount(key);
     if (earned == null && own == null) return null;
     return savingsRound((earned || 0) + (own || 0));
   }
@@ -2304,7 +2338,7 @@
 
   function savingsCalc(kind, key) {
     if (kind === "earned") return savingsEarned(key);
-    if (kind === "own") return setAsideForMonth(key);
+    if (kind === "own") return ownAmount(key);
     if (kind === "flat1" || kind === "flat2" || kind === "garage") return rentSavings(kind, key);
     if (kind === "broker") return brokerIncomeSum(key);
     if (kind === "topup") return savingsTopup(key);
@@ -2376,6 +2410,7 @@
   }
 
   function savingsValue(row, monthKey) {
+    if (row.id === "own") return ownAmount(monthKey);
     return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
   }
 
@@ -2391,6 +2426,15 @@
   }
 
   function savingsCell(row, monthKey, editable) {
+    if (row.id === "own") {
+      const value = ownAmount(monthKey);
+      const shown = value == null ? "" : formatEditable(value);
+      const title = ` title="${escapeAttr(ownIsManual(monthKey) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить")}"`;
+      if (!editable) {
+        return `<input class="num-input" type="text" readonly data-own="1" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}"${title} />`;
+      }
+      return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-own="1" data-settle="1" data-row="own" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
+    }
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
     if (row.calc) {
@@ -2409,7 +2453,18 @@
     return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
+  function paintOwnInputs() {
+    document.querySelectorAll("#savingsBody input[data-own]").forEach((input) => {
+      if (document.activeElement === input) return;
+      const key = input.dataset.month;
+      const amount = ownAmount(key);
+      input.value = amount == null ? "" : formatEditable(amount);
+      input.title = ownIsManual(key) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить";
+    });
+  }
+
   function paintSavingsCalcs() {
+    paintOwnInputs();
     document.querySelectorAll("#savingsBody input[data-calc]").forEach((input) => {
       const row = savingsLines().find((item) => item.id === input.dataset.calc);
       if (!row) return;
@@ -2454,6 +2509,23 @@
         input.addEventListener("change", () => {
           const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
+          if (row.id === "own") {
+            const auto = ownFromSetAside(monthKey);
+            if (!state.savingsFact.ownManual) state.savingsFact.ownManual = {};
+            if (!state.savingsFact.rows.own) state.savingsFact.rows.own = {};
+            if (parsed == null || parsed === auto) {
+              delete state.savingsFact.ownManual[monthKey];
+              delete state.savingsFact.rows.own[monthKey];
+            } else {
+              state.savingsFact.ownManual[monthKey] = true;
+              state.savingsFact.rows.own[monthKey] = parsed;
+            }
+            clearSavingsSettled(row.id, monthKey);
+            saveState();
+            paintOwnInputs();
+            paintSavingsCalcs();
+            return;
+          }
           if (!state.savingsFact.rows[row.id]) state.savingsFact.rows[row.id] = {};
           if (parsed == null) {
             delete state.savingsFact.rows[row.id][monthKey];
