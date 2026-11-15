@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.28.7";
+  const APP_VERSION = "1.28.9";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2779,7 +2779,6 @@
       const tr = document.createElement("tr");
       if (row.id === "passive" || row.id === "topup") tr.classList.add("is-savings-mark");
       if (row.fold) tr.classList.add("is-fold");
-      if (open) tr.classList.add("is-open");
       tr.innerHTML = `
         <td>${row.fold ? savingsFoldCell(row.name, open) : savingsNameCell(row)}</td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
@@ -2849,15 +2848,22 @@
     });
   }
 
+  function appendSavingsRule() {
+    const tr = document.createElement("tr");
+    tr.className = "savings-rule";
+    tr.setAttribute("aria-hidden", "true");
+    const cells = els.savingsBody.firstElementChild?.children.length || 5;
+    tr.innerHTML = `<td colspan="${cells}"></td>`;
+    els.savingsBody.appendChild(tr);
+  }
+
   function appendRentSavings(months) {
     const lines = (monthByKey(state.currentMonth)?.income || []).find(isRentRow)?.lines || [];
-    if (!lines.length) {
-      els.savingsBody.lastElementChild?.classList.add("is-group-end");
-      return;
-    }
-    lines.forEach((line, index) => {
+    if (!lines.length) return;
+    appendSavingsRule();
+    lines.forEach((line) => {
       const tr = document.createElement("tr");
-      tr.className = `savings-detail${index === lines.length - 1 ? " is-group-end" : ""}`;
+      tr.className = "savings-detail";
       tr.innerHTML = `
         <td><span class="savings-label savings-detail-label">${escapeAttr(line.label || "Аренда")}</span></td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${rentDetailCell(line, month)}</td>`).join("")}
@@ -2872,6 +2878,7 @@
       bindSavingsSettle(tr);
       els.savingsBody.appendChild(tr);
     });
+    appendSavingsRule();
   }
 
   function rentDetailCell(line, month) {
@@ -2887,6 +2894,7 @@
   function renderBrokerIncomes(months) {
     if (!els.savingsBody || !state.savingsFact) return;
     const rows = state.savingsFact.brokerIncomes || [];
+    appendSavingsRule();
     rows.forEach((row) => {
       if (!row.amounts) row.amounts = {};
       const tr = document.createElement("tr");
@@ -2951,7 +2959,7 @@
       });
     });
     const add = document.createElement("tr");
-    add.className = "savings-detail is-group-end";
+    add.className = "savings-detail";
     add.innerHTML = `<td colspan="5"><button type="button" class="btn btn-small" data-add-broker>+ доход</button></td>`;
     add.querySelector("[data-add-broker]").addEventListener("click", () => {
       if (!state.savingsFact.brokerIncomes) state.savingsFact.brokerIncomes = [];
@@ -2960,6 +2968,7 @@
       renderSavings();
     });
     els.savingsBody.appendChild(add);
+    appendSavingsRule();
   }
 
   const UTILITY_MONTHS = [
