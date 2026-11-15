@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.26.1";
+  const APP_VERSION = "1.27.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -97,6 +97,8 @@
   let settingsDraftOklad = null;
   let rentMenuKey = null;
   let rentExpanded = false;
+  let savingsRentOpen = false;
+  let savingsBrokerOpen = false;
 
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -1208,22 +1210,44 @@
     detail.className = "rent-detail";
     detail.innerHTML = `
       <td colspan="3">
-        <div class="rent-list" id="rentList"></div>
-        <div class="rent-detail-bar">
-          <button type="button" class="btn btn-small" id="rentAdd">+ строка</button>
-          <span>В доходе <strong id="rentSum">0 ₽</strong></span>
+        <div class="rent-fold">
+          <div class="rent-fold-inner">
+            <div class="rent-list" id="rentList"></div>
+            <div class="rent-detail-bar">
+              <button type="button" class="btn btn-small" id="rentAdd">+ строка</button>
+              <span>В доходе <strong id="rentSum">0 ₽</strong></span>
+            </div>
+            <p class="rent-detail-note">Правка действует на этот месяц и все следующие. Двойное нажатие по сумме отмечает, что она внесена.</p>
+          </div>
         </div>
-        <p class="rent-detail-note">Правка действует на этот месяц и все следующие. Двойное нажатие по сумме отмечает, что она внесена.</p>
       </td>
     `;
     detail.querySelector("#rentAdd").addEventListener("click", () => addRentLine(state.currentMonth));
     els.incomeBody.appendChild(detail);
     renderRentMenu();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => detail.classList.add("is-shown"));
+    });
   }
 
   function toggleRentDetail() {
-    rentExpanded = !rentExpanded;
-    rentMenuKey = rentExpanded ? state.currentMonth : null;
+    const detail = document.querySelector("#incomeBody .rent-detail");
+    if (rentExpanded && detail) {
+      rentExpanded = false;
+      rentMenuKey = null;
+      detail.classList.remove("is-shown");
+      let closed = false;
+      const finish = () => {
+        if (closed || rentExpanded) return;
+        closed = true;
+        renderIncome(activeMonth());
+      };
+      detail.addEventListener("transitionend", finish, { once: true });
+      window.setTimeout(finish, 460);
+      return;
+    }
+    rentExpanded = true;
+    rentMenuKey = state.currentMonth;
     renderIncome(activeMonth());
   }
 
@@ -2329,25 +2353,27 @@
     renderAnalytics();
   }
 
+  function rentMonthTotal(key) {
+    const row = (monthByKey(key)?.income || []).find(isRentRow);
+    if (!row?.lines?.length) return null;
+    const active = row.lines.filter((line) => line.active !== false);
+    if (!active.length) return null;
+    return savingsRound(rentTotal(row.lines));
+  }
+
+  function rentLineAmount(lineId, monthKey) {
+    const row = (monthByKey(monthKey)?.income || []).find(isRentRow);
+    const line = row?.lines?.find((item) => item.id === lineId);
+    if (!line || line.active === false) return null;
+    const n = Number(line.amount);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function savingsEarned(key) {
-    const parts = [];
-    savingsLines().forEach((row) => {
-      if (row.id === "broker") {
-        const broker = brokerIncomeSum(key);
-        if (broker != null) parts.push(broker);
-        return;
-      }
-      if (row.id === "flat1" || row.id === "flat2" || row.id === "garage") {
-        const rent = rentSavings(row.id, key);
-        if (rent != null) parts.push(rent);
-        return;
-      }
-      if (row.calc || SAVINGS_ASIDE.has(row.id)) return;
-      const value = savingsStored(row.id, key);
-      if (value != null) parts.push(value);
-    });
-    if (!parts.length) return null;
-    return savingsRound(parts.reduce((sum, value) => sum + value, 0));
+    const rent = rentMonthTotal(key);
+    const broker = brokerIncomeSum(key);
+    if (rent == null && broker == null) return null;
+    return savingsRound((rent || 0) + (broker || 0));
   }
 
   function ownShareSkipped(key) {
@@ -2515,17 +2541,17 @@
   }
 
   function savingsValue(row, monthKey) {
+    if (row.id === "rent") return rentMonthTotal(monthKey);
+    if (row.id === "broker") return brokerIncomeSum(monthKey);
+    if (row.id === "passive") return savingsEarned(monthKey);
     if (row.id === "own") return ownAmount(monthKey);
+    if (row.id === "topup") return savingsTopup(monthKey);
     return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
   }
 
   function savingsNameCell(row) {
-    if (row.id === "earned") {
-      return `<span class="savings-label">Заработал в месяц пассив</span>`;
-    }
-    if (row.id === "topup") {
-      return `<span class="savings-label">Пополнил БС</span>`;
-    }
+    if (row.id === "passive") return `<span class="savings-label">Пассивный доход в месяц</span>`;
+    if (row.id === "topup") return `<span class="savings-label">Всего пополнил БС в месяце</span>`;
     if (row.calc) return nameCell(row.name);
     return `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
   }
@@ -2571,9 +2597,7 @@
   function paintSavingsCalcs() {
     paintOwnInputs();
     document.querySelectorAll("#savingsBody input[data-calc]").forEach((input) => {
-      const row = savingsLines().find((item) => item.id === input.dataset.calc);
-      if (!row) return;
-      const value = savingsValue(row, input.dataset.month);
+      const value = savingsValue({ id: input.dataset.calc, calc: input.dataset.calc }, input.dataset.month);
       input.value = value == null ? "" : formatEditable(value);
     });
   }
@@ -2594,93 +2618,107 @@
       </tr>
     `;
     els.savingsBody.innerHTML = "";
-    savingsLines().forEach((row) => {
+    const summary = [
+      { id: "rent", name: "Аренда", calc: "rent", fold: "rent" },
+      { id: "broker", name: "Брокерский счет", calc: "broker", fold: "broker" },
+      { id: "own", name: "Вложил свои", calc: "own" },
+      { id: "passive", name: "Пассивный доход в месяц", calc: "passive" },
+      { id: "topup", name: "Всего пополнил БС в месяце", calc: "topup" },
+    ];
+    const appendSummary = (row) => {
+      const open = row.fold === "rent" ? savingsRentOpen : row.fold === "broker" ? savingsBrokerOpen : false;
       const tr = document.createElement("tr");
-      if (row.calc) tr.classList.add("is-total");
-      if (row.id === "earned" || row.id === "topup") tr.classList.add("is-savings-mark");
-      const action = row.calc
-        ? ""
-        : `<button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button>`;
+      if (row.id === "passive" || row.id === "topup") tr.classList.add("is-savings-mark");
+      if (row.fold) tr.classList.add("is-fold");
       tr.innerHTML = `
-        <td>${savingsNameCell(row)}</td>
+        <td>${row.fold ? savingsFoldCell(row.name, open) : savingsNameCell(row)}</td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
-        <td class="actions-col">${action}</td>
+        <td class="actions-col"></td>
       `;
-      tr.querySelector("[data-field='name']")?.addEventListener("change", (event) => {
-        row.name = event.target.value.trim() || "Строка";
-        saveState();
-      });
-      tr.querySelectorAll("input[data-month]").forEach((input) => {
-        input.addEventListener("change", () => {
-          const monthKey = input.dataset.month;
-          const parsed = parseNumber(input.value);
-          if (row.id === "own") {
-            const auto = ownFromSetAside(monthKey);
-            if (!state.savingsFact.ownManual) state.savingsFact.ownManual = {};
-            if (!state.savingsFact.rows.own) state.savingsFact.rows.own = {};
-            if (parsed == null || parsed === auto) {
-              delete state.savingsFact.ownManual[monthKey];
-              delete state.savingsFact.rows.own[monthKey];
-            } else {
-              state.savingsFact.ownManual[monthKey] = true;
-              state.savingsFact.rows.own[monthKey] = parsed;
-            }
-            clearSavingsSettled(row.id, monthKey);
-            saveState();
-            paintOwnInputs();
-            paintSavingsCalcs();
-            return;
-          }
-          if (!state.savingsFact.rows[row.id]) state.savingsFact.rows[row.id] = {};
-          if (parsed == null) {
-            delete state.savingsFact.rows[row.id][monthKey];
-            clearSavingsSettled(row.id, monthKey);
-          } else state.savingsFact.rows[row.id][monthKey] = parsed;
-          saveState();
-          input.value = parsed == null ? "" : formatEditable(parsed);
-          input.classList.remove("is-settled");
-          input.removeAttribute("title");
-          paintSavingsCalcs();
-        });
-      });
-      tr.querySelector("[data-act='del']")?.addEventListener("click", () => {
-        state.savingsFact.lines = savingsLines().filter((item) => item.id !== row.id);
-        delete state.savingsFact.rows[row.id];
-        if (state.savingsFact.settled) delete state.savingsFact.settled[row.id];
-        saveState();
+      tr.querySelector(".savings-fold")?.addEventListener("click", () => {
+        if (row.fold === "rent") savingsRentOpen = !savingsRentOpen;
+        else savingsBrokerOpen = !savingsBrokerOpen;
         renderSavings();
       });
+      if (row.id === "own") bindOwnInputs(tr, row);
       els.savingsBody.appendChild(tr);
-      tr.querySelectorAll("input[data-settle]").forEach((input) => {
-        input.addEventListener("dblclick", (event) => {
-          const monthKey = input.dataset.month;
-          if (savingsValue(row, monthKey) == null) return;
-          event.preventDefault();
-          toggleSavingsSettled(row.id, monthKey);
-          paintSettled(input, savingsIsSettled(row.id, monthKey));
-          saveState();
-          releaseSelection(input);
-        });
-        armNoSelect(input);
+      if (row.fold === "rent" && open) appendRentSavings(months);
+      if (row.fold === "broker" && open) renderBrokerIncomes(months);
+    };
+    summary.forEach(appendSummary);
+  }
+
+  function savingsFoldCell(label, open) {
+    return `<button type="button" class="savings-fold" aria-expanded="${open ? "true" : "false"}"><span class="savings-fold-mark" aria-hidden="true">${open ? "▾" : "▸"}</span><span>${escapeAttr(label)}</span></button>`;
+  }
+
+  function bindOwnInputs(tr, row) {
+    tr.querySelectorAll("input[data-month]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const monthKey = input.dataset.month;
+        const parsed = parseNumber(input.value);
+        const auto = ownFromSetAside(monthKey);
+        if (!state.savingsFact.ownManual) state.savingsFact.ownManual = {};
+        if (!state.savingsFact.rows.own) state.savingsFact.rows.own = {};
+        if (parsed == null || parsed === auto) {
+          delete state.savingsFact.ownManual[monthKey];
+          delete state.savingsFact.rows.own[monthKey];
+        } else {
+          state.savingsFact.ownManual[monthKey] = true;
+          state.savingsFact.rows.own[monthKey] = parsed;
+        }
+        clearSavingsSettled(row.id, monthKey);
+        saveState();
+        paintOwnInputs();
+        paintSavingsCalcs();
       });
+      input.addEventListener("dblclick", (event) => {
+        const monthKey = input.dataset.month;
+        if (savingsValue(row, monthKey) == null) return;
+        event.preventDefault();
+        toggleSavingsSettled(row.id, monthKey);
+        paintSettled(input, savingsIsSettled(row.id, monthKey));
+        saveState();
+        releaseSelection(input);
+      });
+      armNoSelect(input);
     });
-    renderBrokerIncomes(months);
+  }
+
+  function appendRentSavings(months) {
+    const lines = (monthByKey(state.currentMonth)?.income || []).find(isRentRow)?.lines || [];
+    lines.forEach((line) => {
+      const tr = document.createElement("tr");
+      tr.className = "savings-detail";
+      tr.innerHTML = `
+        <td><span class="savings-label savings-detail-label">${escapeAttr(line.label || "Аренда")}</span></td>
+        ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${rentDetailCell(line, month)}</td>`).join("")}
+        <td class="actions-col"></td>
+      `;
+      tr.querySelectorAll("input[data-rent-line]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const parsed = parseNumber(input.value);
+          patchRentLine(input.dataset.month, line.id, { amount: parsed || 0 });
+        });
+      });
+      els.savingsBody.appendChild(tr);
+    });
+  }
+
+  function rentDetailCell(line, month) {
+    const value = rentLineAmount(line.id, month.key);
+    const shown = value == null ? "" : formatEditable(value);
+    if (!month.editable) return readCell(shown);
+    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-rent-line="${escapeAttr(line.id)}" data-month="${escapeAttr(month.key)}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
   function renderBrokerIncomes(months) {
-    if (!els.brokerIncomeHead || !els.brokerIncomeBody || !state.savingsFact) return;
+    if (!els.savingsBody || !state.savingsFact) return;
     const rows = state.savingsFact.brokerIncomes || [];
-    els.brokerIncomeHead.innerHTML = `
-      <tr>
-        <th><span class="col-title">Доход</span></th>
-        ${months.map((month, index) => `<th class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}"><span class="col-title">${escapeAttr(monthChip(month.key))}</span></th>`).join("")}
-        <th class="actions-col"></th>
-      </tr>
-    `;
-    els.brokerIncomeBody.innerHTML = "";
     rows.forEach((row) => {
       if (!row.amounts) row.amounts = {};
       const tr = document.createElement("tr");
+      tr.className = "savings-detail";
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" /></td>
         ${months.map((month, index) => {
@@ -2703,6 +2741,7 @@
         saveState();
       });
       tr.querySelectorAll("input[data-month]").forEach((input) => {
+        if (input.readOnly) return;
         input.addEventListener("change", () => {
           const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
@@ -2726,7 +2765,7 @@
         renderSavings();
         refreshBrokerSurfaces();
       });
-      els.brokerIncomeBody.appendChild(tr);
+      els.savingsBody.appendChild(tr);
       tr.querySelectorAll("input[data-settle]").forEach((input) => {
         input.addEventListener("dblclick", (event) => {
           const monthKey = input.dataset.month;
@@ -2741,6 +2780,16 @@
         armNoSelect(input);
       });
     });
+    const add = document.createElement("tr");
+    add.className = "savings-detail";
+    add.innerHTML = `<td colspan="5"><button type="button" class="btn btn-small" data-add-broker>+ доход</button></td>`;
+    add.querySelector("[data-add-broker]").addEventListener("click", () => {
+      if (!state.savingsFact.brokerIncomes) state.savingsFact.brokerIncomes = [];
+      state.savingsFact.brokerIncomes.push({ id: uid("brk"), name: "Новый доход", amounts: {} });
+      saveState();
+      renderSavings();
+    });
+    els.savingsBody.appendChild(add);
   }
 
   const UTILITY_MONTHS = [

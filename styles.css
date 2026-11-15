@@ -1342,9 +1342,45 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 
 .savings-table .savings-label {
   display: block;
-  white-space: nowrap;
+  white-space: normal;
   text-align: center;
   line-height: 1.2;
+}
+
+.savings-fold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: var(--tap);
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.savings-fold-mark {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.savings-detail .savings-detail-label,
+.savings-detail .name-input {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.savings-detail td:first-child {
+  animation: savings-slide 0.2s ease;
+}
+
+@keyframes savings-slide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .savings-table tr.is-savings-mark .savings-label,
@@ -1427,8 +1463,49 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 }
 
 .rent-detail td {
-  padding-top: 0.15rem;
-  padding-bottom: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+.rent-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.32s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rent-detail.is-shown .rent-fold {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+}
+
+.rent-fold-inner {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.2rem 0 0.85rem;
+}
+
+.rent-detail,
+.rent-detail .rent-line .name-input,
+.rent-detail .rent-line .num-input,
+.rent-detail-note,
+.rent-detail-bar {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 500;
+  color: #6a5644;
+}
+
+.rent-detail .rent-line input:not([type="checkbox"]):not([type="radio"]) {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 500;
+  color: #6a5644;
+  border-bottom: 1px solid rgba(106, 86, 68, 0.28);
 }
 
 .rent-detail-bar {
