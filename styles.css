@@ -26,6 +26,25 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --tap: 44px;
   --field-fs: 16px;
+  --chart-income-1: #1d6b45;
+  --chart-expense-1: #8d3a32;
+  --chart-saved-1: #9a6424;
+  --chart-utility-1: #1f4d4a;
+  --chart-income-2: #6aa384;
+  --chart-expense-2: #c47a72;
+  --chart-saved-2: #c49658;
+  --chart-utility-2: #5d8d89;
+  --chart-income-3: #143f2c;
+  --chart-expense-3: #5c2420;
+  --chart-saved-3: #6d4718;
+  --chart-utility-3: #143330;
+  --chart-axis: #6d6962;
+  --chart-label: #3f3c37;
+  --chart-grid: rgba(28, 27, 25, 0.14);
+  --chart-tick: rgba(28, 27, 25, 0.28);
+  --chart-baseline: rgba(28, 27, 25, 0.18);
+  --chart-band: rgba(28, 27, 25, 0.05);
+  --chart-ring: #f7f4ee;
 }
 
 *,
@@ -218,6 +237,47 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 .nav-action:hover { opacity: 0.65; }
 
 .file-btn input { display: none; }
+
+.theme-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.6rem;
+}
+
+body:has(#navToggle:checked) .theme-switch {
+  animation: rise 0.6s var(--ease) 0.24s both;
+}
+
+.theme-switch-title {
+  width: 100%;
+  margin: 0 0 0.15rem;
+  color: rgba(243, 240, 232, 0.62);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-option {
+  appearance: none;
+  min-height: var(--tap);
+  padding: 0.55rem 1.1rem;
+  border: 1px solid rgba(243, 240, 232, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cream);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease);
+}
+
+.theme-option[aria-checked="true"] {
+  background: var(--cream);
+  border-color: var(--cream);
+  color: var(--ink);
+}
 
 .nav-note {
   margin: 1.4rem 0 0;
