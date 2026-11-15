@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.22.2";
+  const APP_VERSION = "1.23.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1041,6 +1041,7 @@
     state.seeded = false;
     saveState();
     paintRentRow();
+    renderSavings();
     if (els.rentDialog.open) renderRentMenu();
   }
 
@@ -1060,6 +1061,7 @@
     state.seeded = false;
     saveState();
     paintRentRow();
+    renderSavings();
     renderRentMenu();
     const names = els.rentList.querySelectorAll(".name-input");
     const last = names[names.length - 1];
@@ -1081,6 +1083,7 @@
     state.seeded = false;
     saveState();
     paintRentRow();
+    renderSavings();
     renderRentMenu();
   }
 
@@ -2099,9 +2102,9 @@
     { id: "broker", name: "Брокерский счет", calc: "broker" },
     { id: "iis", name: "ИИС" },
     { id: "iis3", name: "ИИС 3" },
-    { id: "flat1", name: "Квартира 1" },
-    { id: "flat2", name: "Квартира 2" },
-    { id: "garage", name: "Гараж" },
+    { id: "flat1", name: "Квартира 1", calc: "flat1" },
+    { id: "flat2", name: "Квартира 2", calc: "flat2" },
+    { id: "garage", name: "Гараж", calc: "garage" },
     { id: "own", name: "Вложил свои", calc: "own" },
     { id: "earned", name: "Заработал в месяц", calc: "earned" },
     { id: "topup", name: "Пополнил БС", calc: "topup" },
@@ -2178,6 +2181,9 @@
     const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id));
     const own = rest.find((row) => row.id === "own");
     if (own) own.calc = "own";
+    rest.forEach((row) => {
+      if (row.id === "flat1" || row.id === "flat2" || row.id === "garage") row.calc = row.id;
+    });
     const earned = byId.earned || { id: "earned", name: "Заработал в месяц", calc: "earned" };
     earned.name = "Заработал в месяц";
     earned.calc = "earned";
@@ -2225,6 +2231,11 @@
         if (broker != null) parts.push(broker);
         return;
       }
+      if (row.id === "flat1" || row.id === "flat2" || row.id === "garage") {
+        const rent = rentSavings(row.id, key);
+        if (rent != null) parts.push(rent);
+        return;
+      }
       if (row.calc || SAVINGS_ASIDE.has(row.id)) return;
       const value = savingsStored(row.id, key);
       if (value != null) parts.push(value);
@@ -2256,6 +2267,27 @@
     return found ? savingsRound(sum) : null;
   }
 
+  function rentSavings(kind, key) {
+    const month = monthByKey(key);
+    const row = (month?.income || []).find(isRentRow);
+    if (!row?.lines?.length) return null;
+    const parts = [];
+    row.lines.forEach((line) => {
+      if (line.active === false || rentSavingsKind(line) !== kind) return;
+      const n = Number(line.amount);
+      if (Number.isFinite(n)) parts.push(n);
+    });
+    if (!parts.length) return null;
+    return savingsRound(parts.reduce((sum, value) => sum + value, 0));
+  }
+
+  function rentSavingsKind(line) {
+    if (line.id === "rent_gaz" || /газовик/i.test(line.label || "")) return "flat1";
+    if (line.id === "rent_quiet" || /тихий/i.test(line.label || "")) return "flat2";
+    if (line.id === "rent_garage" || /гараж/i.test(line.label || "")) return "garage";
+    return "";
+  }
+
   function savingsTopup(key) {
     const earned = savingsEarned(key);
     const own = setAsideForMonth(key);
@@ -2273,6 +2305,7 @@
   function savingsCalc(kind, key) {
     if (kind === "earned") return savingsEarned(key);
     if (kind === "own") return setAsideForMonth(key);
+    if (kind === "flat1" || kind === "flat2" || kind === "garage") return rentSavings(kind, key);
     if (kind === "broker") return brokerIncomeSum(key);
     if (kind === "topup") return savingsTopup(key);
     return savingsDelta(key);
@@ -2360,8 +2393,11 @@
   function savingsCell(row, monthKey, editable) {
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
-    if (row.calc || !editable) {
-      if (row.calc || value == null) return readCell(shown);
+    if (row.calc) {
+      return `<input class="num-input" type="text" readonly data-calc="${escapeAttr(row.id)}" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}" placeholder="—" />`;
+    }
+    if (!editable) {
+      if (value == null) return readCell(shown);
       const settled = savingsIsSettled(row.id, monthKey);
       const title = ` title="${escapeAttr(settledTitle(settled))}"`;
       const cls = settled ? " is-settled" : "";
@@ -2371,6 +2407,15 @@
     const title = value == null ? "" : ` title="${escapeAttr(settledTitle(settled))}"`;
     const cls = settled ? " is-settled" : "";
     return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
+  }
+
+  function paintSavingsCalcs() {
+    document.querySelectorAll("#savingsBody input[data-calc]").forEach((input) => {
+      const row = savingsLines().find((item) => item.id === input.dataset.calc);
+      if (!row) return;
+      const value = savingsValue(row, input.dataset.month);
+      input.value = value == null ? "" : formatEditable(value);
+    });
   }
 
   function renderSavings() {
@@ -2415,7 +2460,10 @@
             clearSavingsSettled(row.id, monthKey);
           } else state.savingsFact.rows[row.id][monthKey] = parsed;
           saveState();
-          renderSavings();
+          input.value = parsed == null ? "" : formatEditable(parsed);
+          input.classList.remove("is-settled");
+          input.removeAttribute("title");
+          paintSavingsCalcs();
         });
       });
       tr.querySelector("[data-act='del']")?.addEventListener("click", () => {
@@ -2486,7 +2534,10 @@
             clearBrokerSettled(row.id, monthKey);
           } else row.amounts[monthKey] = parsed;
           saveState();
-          renderSavings();
+          input.value = parsed == null ? "" : formatEditable(parsed);
+          input.classList.remove("is-settled");
+          input.removeAttribute("title");
+          paintSavingsCalcs();
         });
       });
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
