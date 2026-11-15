@@ -1382,6 +1382,35 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   line-height: 1.2;
 }
 
+.savings-own {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.savings-own .savings-label {
+  display: inline;
+  width: auto;
+}
+
+.savings-recalc {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid rgba(28, 27, 25, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.savings-recalc:hover {
+  background: rgba(28, 27, 25, 0.06);
+}
+
 .savings-fold {
   display: flex;
   align-items: center;

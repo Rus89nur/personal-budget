@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.28.10";
+  const APP_VERSION = "1.29.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2681,6 +2681,9 @@
   function savingsNameCell(row) {
     if (row.id === "passive") return `<span class="savings-label">Пассивный доход в месяц</span>`;
     if (row.id === "topup") return `<span class="savings-label">Всего пополнил БС в месяце</span>`;
+    if (row.id === "own") {
+      return `<span class="savings-own"><span class="savings-label">Вложил свои</span><button type="button" class="savings-recalc" data-recalc-own aria-label="Пересчитать" title="Пересчитать из «Отложить» без аренды и брокера">↻</button></span>`;
+    }
     if (row.calc) return nameCell(row.name);
     return `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
   }
@@ -2789,7 +2792,10 @@
         else savingsBrokerOpen = !savingsBrokerOpen;
         renderSavings();
       });
-      if (row.id === "own") bindOwnInputs(tr, row);
+      if (row.id === "own") {
+        bindOwnInputs(tr, row);
+        tr.querySelector("[data-recalc-own]")?.addEventListener("click", recalcOwnFromSetAside);
+      }
       bindSavingsSettle(tr);
       els.savingsBody.appendChild(tr);
       if (row.fold === "rent" && open) appendRentSavings(months);
@@ -2800,6 +2806,16 @@
 
   function savingsFoldCell(label, open) {
     return `<button type="button" class="savings-fold" aria-expanded="${open ? "true" : "false"}"><span class="savings-fold-mark" aria-hidden="true">${open ? "▾" : "▸"}</span><span>${escapeAttr(label)}</span></button>`;
+  }
+
+  function recalcOwnFromSetAside() {
+    const manual = state.savingsFact.ownManual || {};
+    Object.keys(manual).forEach((key) => clearSavingsSettled("own", key));
+    state.savingsFact.ownManual = {};
+    if (state.savingsFact.rows) state.savingsFact.rows.own = {};
+    saveState();
+    paintSavingsCalcs();
+    renderAnalytics();
   }
 
   function bindOwnInputs(tr, row) {
