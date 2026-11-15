@@ -1404,6 +1404,19 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   font-size: 0.8rem;
 }
 
+.savings-table tr.is-fold.is-open td {
+  border-bottom: 1px solid rgba(106, 86, 68, 0.45);
+}
+
+.savings-table tr.savings-detail td {
+  border-bottom: 1px solid rgba(106, 86, 68, 0.28);
+  background: rgba(154, 122, 78, 0.05);
+}
+
+.savings-table tr.is-group-end td {
+  border-bottom: 1px solid rgba(28, 27, 25, 0.42);
+}
+
 .savings-detail .savings-detail-label,
 .savings-detail .name-input {
   color: var(--ink-soft);

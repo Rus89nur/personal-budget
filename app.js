@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.28.4";
+  const APP_VERSION = "1.28.6";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1690,13 +1690,18 @@
     }, 0);
   }
 
+  function allocatedInColumns(month) {
+    const keys = new Set((month.income || []).map((row) => incomeColumnKey(row)));
+    let sum = 0;
+    keys.forEach((key) => { sum += columnSum(month, key); });
+    return sum;
+  }
+
   function totals(month) {
     const income = month.income.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const plan = columnSum(month, "plan");
-    const spent = month.expenses.reduce((sum, row) => {
-      return sum + Object.values(row.shares || {}).reduce((s, n) => s + (Number(n) || 0), 0);
-    }, 0);
-    return { income, plan, spent, fact: spent, remain: income - plan };
+    const spent = allocatedInColumns(month);
+    return { income, plan, spent, fact: spent, remain: income - spent };
   }
 
   function renderYearNav() {
@@ -2299,21 +2304,18 @@
     els.sumRemain.parentElement.classList.toggle("negative", t.remain < 0);
     paintText(els.incomeTotal, money(t.income));
     paintText(document.querySelector('#expenseHead [data-sum="plan"]'), money(t.income));
-    const planLeft = t.income - t.plan;
-    paintRemain(document.querySelector('#expenseFoot [data-remain="plan"]'), planLeft);
-    let openLeft = 0;
+    paintRemain(document.querySelector('#expenseFoot [data-remain="plan"]'), t.remain);
     month.income.forEach((row) => {
       const head = document.querySelector(`#expenseHead [data-income-id="${CSS.escape(row.id)}"]`);
       const amount = Number(row.amount) || 0;
       if (head) paintText(head, money(amount));
       const leftAmount = amount - columnSum(month, incomeColumnKey(row));
-      openLeft += leftAmount;
       paintRemain(document.querySelector(`#expenseFoot [data-remain-id="${CSS.escape(row.id)}"]`), leftAmount);
     });
     const unallocated = document.getElementById("unallocatedSum");
     const unallocatedCorner = document.getElementById("unallocatedCorner");
-    if (unallocated) paintText(unallocated, money(openLeft));
-    if (unallocatedCorner) unallocatedCorner.classList.toggle("delta-neg", openLeft < 0);
+    if (unallocated) paintText(unallocated, money(t.remain));
+    if (unallocatedCorner) unallocatedCorner.classList.toggle("delta-neg", t.remain < 0);
     paintPlanShortfalls(month);
     paintSetAsideHint();
     paintSavingsCalcs();
@@ -2627,9 +2629,10 @@
     };
   }
 
-  function readCell(value, tone) {
+  function readCell(value, tone, extra) {
     const cls = tone ? ` ${tone}` : "";
-    return `<input class="num-input${cls}" type="text" readonly value="${escapeAttr(value)}" placeholder="—" />`;
+    const attrs = extra ? ` ${extra}` : "";
+    return `<input class="num-input${cls}" type="text" readonly${attrs} value="${escapeAttr(value)}" placeholder="—" />`;
   }
 
   function nameCell(label) {
@@ -2776,6 +2779,7 @@
       const tr = document.createElement("tr");
       if (row.id === "passive" || row.id === "topup") tr.classList.add("is-savings-mark");
       if (row.fold) tr.classList.add("is-fold");
+      if (open) tr.classList.add("is-open");
       tr.innerHTML = `
         <td>${row.fold ? savingsFoldCell(row.name, open) : savingsNameCell(row)}</td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${savingsCell(row, month.key, month.editable)}</td>`).join("")}
@@ -2847,9 +2851,13 @@
 
   function appendRentSavings(months) {
     const lines = (monthByKey(state.currentMonth)?.income || []).find(isRentRow)?.lines || [];
-    lines.forEach((line) => {
+    if (!lines.length) {
+      els.savingsBody.lastElementChild?.classList.add("is-group-end");
+      return;
+    }
+    lines.forEach((line, index) => {
       const tr = document.createElement("tr");
-      tr.className = "savings-detail";
+      tr.className = `savings-detail${index === lines.length - 1 ? " is-group-end" : ""}`;
       tr.innerHTML = `
         <td><span class="savings-label savings-detail-label">${escapeAttr(line.label || "Аренда")}</span></td>
         ${months.map((month, index) => `<td class="num${index === months.length - 2 ? " plan-col" : ""}">${rentDetailCell(line, month)}</td>`).join("")}
@@ -2943,7 +2951,7 @@
       });
     });
     const add = document.createElement("tr");
-    add.className = "savings-detail";
+    add.className = "savings-detail is-group-end";
     add.innerHTML = `<td colspan="5"><button type="button" class="btn btn-small" data-add-broker>+ доход</button></td>`;
     add.querySelector("[data-add-broker]").addEventListener("click", () => {
       if (!state.savingsFact.brokerIncomes) state.savingsFact.brokerIncomes = [];
@@ -2976,22 +2984,45 @@
   function defaultUtilities() {
     return {
       rows: {
-        quietBrus: { "2025-12": 1891.66, "2026-01": 1894, "2026-02": 1888.52, "2026-03": 1864.77, "2026-04": 1833.41, "2026-05": 1902, "2026-06": 1878.25, "2026-07": 1841.57, "2026-08": 1855.72, "2026-09": 1888, "2026-10": 0, "2026-11": 0 },
-        quietUtil: { "2025-12": 1937.3, "2026-01": 2600, "2026-02": 2433.17, "2026-03": 2109.59, "2026-04": 2122.65, "2026-05": 1211, "2026-06": 874, "2026-07": 1077.14, "2026-08": 1230.74, "2026-09": 2451, "2026-10": 0, "2026-11": 0 },
-        gazBrus: { "2025-12": 1581.73, "2026-01": 1643, "2026-02": 1612.83, "2026-03": 1667.44, "2026-04": 1604.56, "2026-05": 1662, "2026-06": 1578.08, "2026-07": 1700.06, "2026-08": 1662.51, "2026-09": 1703, "2026-10": 0, "2026-11": 0 },
-        gazUtil: { "2025-12": 2624.33, "2026-01": 3046, "2026-02": 2645.3, "2026-03": 2625.09, "2026-04": 1847.13, "2026-05": 1532, "2026-06": 1269.65, "2026-07": 1204.08, "2026-08": 1332.22, "2026-09": 1328, "2026-10": 0, "2026-11": 0 },
-        gas: { "2025-12": 363.79, "2026-01": 363.79, "2026-02": 369.85, "2026-03": 369.85, "2026-04": 369.85, "2026-05": 369, "2026-06": 369.85, "2026-07": 369.85, "2026-08": 369.85, "2026-09": 369, "2026-10": 0, "2026-11": 0 },
-        nur: { "2025-12": 11132, "2026-01": 13375, "2026-02": 11962, "2026-03": 12267.52, "2026-04": 10253.34, "2026-05": 5506, "2026-06": 7420.06, "2026-07": 3483.87, "2026-08": 3240, "2026-09": 4142, "2026-10": 0, "2026-11": 0 },
-        light: { "2025-12": 2176.87, "2026-01": 3684, "2026-02": 3205.1, "2026-03": 1932.32, "2026-04": 2199.6, "2026-05": 1532, "2026-06": 1879.57, "2026-07": 3416.76, "2026-08": 1542, "2026-09": 2479.8, "2026-10": 0, "2026-11": 0 },
+        quietBrus: { "2025-12": 1891.66, "2026-01": 1894, "2026-02": 1888.52, "2026-03": 1864.77, "2026-04": 1833.41, "2026-05": 1902, "2026-06": 1878.25, "2026-07": 1841.57, "2026-08": 1855.72, "2026-09": 1888 },
+        quietUtil: { "2025-12": 1937.3, "2026-01": 2600, "2026-02": 2433.17, "2026-03": 2109.59, "2026-04": 2122.65, "2026-05": 1211, "2026-06": 874, "2026-07": 1077.14, "2026-08": 1230.74, "2026-09": 2451 },
+        gazBrus: { "2025-12": 1581.73, "2026-01": 1643, "2026-02": 1612.83, "2026-03": 1667.44, "2026-04": 1604.56, "2026-05": 1662, "2026-06": 1578.08, "2026-07": 1700.06, "2026-08": 1662.51, "2026-09": 1703 },
+        gazUtil: { "2025-12": 2624.33, "2026-01": 3046, "2026-02": 2645.3, "2026-03": 2625.09, "2026-04": 1847.13, "2026-05": 1532, "2026-06": 1269.65, "2026-07": 1204.08, "2026-08": 1332.22, "2026-09": 1328 },
+        gas: { "2025-12": 363.79, "2026-01": 363.79, "2026-02": 369.85, "2026-03": 369.85, "2026-04": 369.85, "2026-05": 369, "2026-06": 369.85, "2026-07": 369.85, "2026-08": 369.85, "2026-09": 369 },
+        nur: { "2025-12": 11132, "2026-01": 13375, "2026-02": 11962, "2026-03": 12267.52, "2026-04": 10253.34, "2026-05": 5506, "2026-06": 7420.06, "2026-07": 3483.87, "2026-08": 3240, "2026-09": 4142 },
+        light: { "2025-12": 2176.87, "2026-01": 3684, "2026-02": 3205.1, "2026-03": 1932.32, "2026-04": 2199.6, "2026-05": 1532, "2026-06": 1879.57, "2026-07": 3416.76, "2026-08": 1542, "2026-09": 2479.8 },
         door: { "2026-02": 1000, "2026-04": 500 },
       },
     };
   }
 
   function ensureUtilities(target) {
-    if (target.utilities?.rows) return false;
-    target.utilities = defaultUtilities();
+    if (!target.utilities?.rows) {
+      target.utilities = defaultUtilities();
+      target.utilities.seedZerosCleared = true;
+      return true;
+    }
+    return clearUtilitySeedZeros(target);
+  }
+
+  function clearUtilitySeedZeros(target) {
+    if (!target.utilities?.rows || target.utilities.seedZerosCleared) return false;
+    ["2026-10", "2026-11"].forEach((month) => {
+      Object.values(target.utilities.rows).forEach((amounts) => {
+        if (!amounts || typeof amounts !== "object") return;
+        if (Number(amounts[month]) === 0) delete amounts[month];
+      });
+    });
+    target.utilities.seedZerosCleared = true;
     return true;
+  }
+
+  function writeUtilityAmount(id, monthKey, parsed) {
+    if (!state.utilities.rows[id]) state.utilities.rows[id] = {};
+    if (parsed == null) {
+      delete state.utilities.rows[id][monthKey];
+      clearUtilitySettled(id, monthKey);
+    } else state.utilities.rows[id][monthKey] = parsed;
   }
 
   function utilityStored(id, key) {
@@ -3076,6 +3107,29 @@
     return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${id}" data-util="${id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
+  function paintUtilityComparisons() {
+    const inputKey = previousMonthKey(state.currentMonth);
+    const compareKey = previousMonthKey(inputKey);
+    document.querySelectorAll("#utilitiesBody tr").forEach((tr) => {
+      const id = tr.dataset.util || "";
+      const current = id ? utilityStored(id, inputKey) : utilityTotal(inputKey);
+      const previous = id ? utilityStored(id, compareKey) : utilityTotal(compareKey);
+      const view = compareView(current, previous);
+      const delta = tr.querySelector("[data-util-delta]");
+      const percent = tr.querySelector("[data-util-percent]");
+      if (delta) {
+        delta.value = view.deltaText;
+        delta.classList.remove("utility-up", "utility-down");
+        if (view.deltaTone) delta.classList.add(view.deltaTone);
+      }
+      if (percent) {
+        percent.value = view.percentText;
+        percent.classList.remove("utility-up", "utility-down");
+        if (view.percentTone) percent.classList.add(view.percentTone);
+      }
+    });
+  }
+
   function renderUtilities() {
     if (!els.utilitiesHead || !els.utilitiesBody || !state.utilities) return;
     const inputKey = previousMonthKey(state.currentMonth);
@@ -3101,21 +3155,19 @@
         <td>${utilityNameCell(title)}</td>
         <td class="num plan-col">${utilityAmountCell(rowId, compareKey, previous, false)}</td>
         <td class="num is-entry">${utilityAmountCell(rowId, inputKey, current, Boolean(editableId))}</td>
-        <td class="num">${readCell(view.deltaText, view.deltaTone)}</td>
-        <td class="num">${readCell(view.percentText, view.percentTone)}</td>
+        <td class="num">${readCell(view.deltaText, view.deltaTone, "data-util-delta=\"1\"")}</td>
+        <td class="num">${readCell(view.percentText, view.percentTone, "data-util-percent=\"1\"")}</td>
       `;
+      if (editableId) tr.dataset.util = editableId;
       const input = tr.querySelector("input[data-row]:not([readonly])");
       if (input) {
-        input.addEventListener("change", () => {
-          const parsed = parseNumber(input.value);
-          if (!state.utilities.rows[editableId]) state.utilities.rows[editableId] = {};
-          if (parsed == null) {
-            delete state.utilities.rows[editableId][inputKey];
-            clearUtilitySettled(editableId, inputKey);
-          } else state.utilities.rows[editableId][inputKey] = parsed;
+        const commit = () => {
+          writeUtilityAmount(editableId, inputKey, parseNumber(input.value));
           saveState();
-          renderUtilities();
-        });
+          paintUtilityComparisons();
+        };
+        input.addEventListener("input", commit);
+        input.addEventListener("change", commit);
       }
       tr.querySelectorAll("input[data-settle]").forEach((cell) => {
         armNoSelect(cell);
