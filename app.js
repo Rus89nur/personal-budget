@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.29.0";
+  const APP_VERSION = "1.29.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2024,7 +2024,16 @@
           saveState();
         });
         tr.querySelector('[data-act="del"]').addEventListener("click", () => {
-          month.income = month.income.filter((r) => r.id !== row.id);
+          const column = incomeColumnKey(row);
+          const stillUsed = month.income.some((item) => item.id !== row.id && incomeColumnKey(item) === column);
+          month.income = month.income.filter((item) => item.id !== row.id);
+          if (!stillUsed) {
+            month.expenses.forEach((expense) => {
+              if (expense.shares) delete expense.shares[column];
+              if (expense.sharesManual) delete expense.sharesManual[column];
+              if (expense.settled) delete expense.settled[column];
+            });
+          }
           state.seeded = false;
           saveState();
           render();
@@ -2509,16 +2518,40 @@
     return /аренд/.test(label) || /брокер/.test(label);
   }
 
+  function liveShareKeys(month) {
+    return new Set((month?.income || []).map((row) => incomeColumnKey(row)));
+  }
+
+  function dropOrphanShares(target) {
+    let changed = false;
+    Object.values(target.years || {}).forEach((year) => {
+      Object.values(year.months || {}).forEach((month) => {
+        const live = liveShareKeys(month);
+        (month.expenses || []).forEach((row) => {
+          ["shares", "sharesManual", "settled"].forEach((bag) => {
+            Object.keys(row[bag] || {}).forEach((col) => {
+              if (col === "plan" || live.has(col)) return;
+              delete row[bag][col];
+              changed = true;
+            });
+          });
+        });
+      });
+    });
+    return changed;
+  }
+
   function ownFromSetAside(key) {
     const month = state.years?.[yearOf(key)]?.months?.[key];
     if (!month?.expenses) return null;
+    const live = liveShareKeys(month);
     let sum = 0;
     let found = false;
     month.expenses.forEach((row) => {
       if (!isSetAsideRow(row)) return;
       normalizeExpense(row);
       Object.keys(row.shares || {}).forEach((col) => {
-        if (ownShareSkipped(col)) return;
+        if (!live.has(col) || ownShareSkipped(col)) return;
         const value = cellValue(row, col);
         if (value == null) return;
         sum += value;
@@ -3997,6 +4030,7 @@
     const savingsApplied = applySheetSavings(state, sheetSavings);
     const rentBackfill = backfillRentFromSavings(state);
     if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || savingsReady || savingsApplied || rentBackfill || ensureUtilities(state)) saveState();
+    if (dropOrphanShares(state)) saveState();
     render();
   }
 
