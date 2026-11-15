@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.25.1";
+  const APP_VERSION = "1.26.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -73,10 +73,8 @@
     netAmount: document.getElementById("netAmount"),
     btnSettingsCancel: document.getElementById("btnSettingsCancel"),
     btnSettingsSave: document.getElementById("btnSettingsSave"),
-    rentDialog: document.getElementById("rentDialog"),
-    rentList: document.getElementById("rentList"),
-    rentSum: document.getElementById("rentSum"),
-    rentAdd: document.getElementById("rentAdd"),
+    rentList: null,
+    rentSum: null,
     savingsHead: document.getElementById("savingsHead"),
     savingsBody: document.getElementById("savingsBody"),
     brokerIncomeHead: document.getElementById("brokerIncomeHead"),
@@ -98,6 +96,7 @@
   let state = null;
   let settingsDraftOklad = null;
   let rentMenuKey = null;
+  let rentExpanded = false;
 
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -1083,7 +1082,7 @@
     saveState();
     paintRentRow();
     renderSavings();
-    if (els.rentDialog.open) renderRentMenu();
+    if (rentExpanded) renderRentMenu();
   }
 
   function addRentLine(fromKey) {
@@ -1103,8 +1102,12 @@
     saveState();
     paintRentRow();
     renderSavings();
-    renderRentMenu();
-    const names = els.rentList.querySelectorAll(".name-input");
+    if (!rentExpanded) {
+      rentExpanded = true;
+      rentMenuKey = fromKey;
+      renderIncome(activeMonth());
+    } else renderRentMenu();
+    const names = document.querySelectorAll("#rentList .name-input");
     const last = names[names.length - 1];
     if (last) {
       last.focus({ preventScroll: true });
@@ -1159,11 +1162,16 @@
   }
 
   function renderRentMenu() {
+    const list = document.getElementById("rentList");
+    const sum = document.getElementById("rentSum");
+    if (!list || !sum) return;
+    els.rentList = list;
+    els.rentSum = sum;
     const key = rentMenuKey || state.currentMonth;
     const month = monthByKey(key);
     if (!month) return;
     const row = ensureRentRow(month, state.rentDefaults);
-    els.rentList.innerHTML = "";
+    list.innerHTML = "";
     row.lines.forEach((line) => {
       const item = document.createElement("div");
       item.className = `rent-line${line.active ? "" : " is-off"}`;
@@ -1190,35 +1198,40 @@
         renderIncome(monthByKey(state.currentMonth));
       });
       remove.addEventListener("click", () => removeRentLine(key, line.id));
-      els.rentList.appendChild(item);
+      list.appendChild(item);
     });
-    els.rentSum.textContent = money(rentTotal(row.lines));
+    sum.textContent = money(rentTotal(row.lines));
   }
 
-  function openRentMenu() {
-    rentMenuKey = state.currentMonth;
+  function appendRentDetail() {
+    const detail = document.createElement("tr");
+    detail.className = "rent-detail";
+    detail.innerHTML = `
+      <td colspan="3">
+        <div class="rent-list" id="rentList"></div>
+        <div class="rent-detail-bar">
+          <button type="button" class="btn btn-small" id="rentAdd">+ строка</button>
+          <span>В доходе <strong id="rentSum">0 ₽</strong></span>
+        </div>
+        <p class="rent-detail-note">Правка действует на этот месяц и все следующие. Двойное нажатие по сумме отмечает, что она внесена.</p>
+      </td>
+    `;
+    detail.querySelector("#rentAdd").addEventListener("click", () => addRentLine(state.currentMonth));
+    els.incomeBody.appendChild(detail);
     renderRentMenu();
-    if (typeof els.rentDialog.showModal === "function") {
-      if (!els.rentDialog.open) els.rentDialog.showModal();
-    } else {
-      els.rentDialog.setAttribute("open", "");
-    }
-    syncDialogScrollLock();
-    const firstAmount = els.rentList.querySelector(".num-input");
-    if (firstAmount) {
-      queueMicrotask(() => {
-        firstAmount.focus({ preventScroll: true });
-        selectField(firstAmount);
-        scrollFieldIntoView(firstAmount);
-      });
-    }
+  }
+
+  function toggleRentDetail() {
+    rentExpanded = !rentExpanded;
+    rentMenuKey = rentExpanded ? state.currentMonth : null;
+    renderIncome(activeMonth());
   }
 
   function closeRentMenu() {
+    if (!rentExpanded) return;
+    rentExpanded = false;
     rentMenuKey = null;
-    if (typeof els.rentDialog.close === "function" && els.rentDialog.open) els.rentDialog.close();
-    else els.rentDialog.removeAttribute("open");
-    syncDialogScrollLock();
+    renderIncome(activeMonth());
   }
 
   function dedupePayrollRows(month) {
@@ -1463,7 +1476,7 @@
   function syncDialogScrollLock() {
     const open = Boolean(
       (els.settingsDialog && els.settingsDialog.open)
-      || (els.rentDialog && els.rentDialog.open)
+      || false
     );
     if (open) lockBodyScroll();
     else unlockBodyScroll();
@@ -1789,21 +1802,23 @@
       }
       if (rent) {
         tr.classList.add("rent-row");
+        if (rentExpanded) tr.classList.add("is-open");
+        const rentHint = rentExpanded ? "Нажмите, чтобы скрыть" : "Нажмите, чтобы раскрыть";
         tr.innerHTML = `
           <td>
-            <input class="name-input" type="text" value="Аренда" data-act="rent" readonly title="Нажмите, чтобы изменить" />
-            <span class="rent-hint">Нажмите, чтобы изменить</span>
+            <input class="name-input" type="text" value="Аренда" data-act="rent" readonly title="${rentHint}" />
+            <span class="rent-hint">${rentHint}</span>
           </td>
-          <td class="num"><input class="num-input${rentIsPaid(row) ? " is-settled" : ""}" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="${escapeAttr(rentIsPaid(row) ? "Квартплата внесена. Двойное нажатие снимет отметку" : "Нажмите, чтобы изменить. Двойное нажатие отмечает, что квартплата внесена")}" /></td>
+          <td class="num"><input class="num-input${rentIsPaid(row) ? " is-settled" : ""}" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="${escapeAttr(rentIsPaid(row) ? "Квартплата внесена. Двойное нажатие снимет отметку" : "Нажмите, чтобы раскрыть. Двойное нажатие отмечает, что квартплата внесена")}" /></td>
           <td class="actions-col"></td>
         `;
-        tr.querySelector("[data-act=rent]").addEventListener("click", openRentMenu);
+        tr.querySelector("[data-act=rent]").addEventListener("click", toggleRentDetail);
         const rentAmount = tr.querySelector("[data-rent-amount]");
         let rentOpenTimer = 0;
         rentAmount.addEventListener("click", (event) => {
           if (event.detail > 1) return;
           clearTimeout(rentOpenTimer);
-          rentOpenTimer = setTimeout(openRentMenu, 240);
+          rentOpenTimer = setTimeout(toggleRentDetail, 240);
         });
         armNoSelect(rentAmount);
         rentAmount.addEventListener("dblclick", (event) => {
@@ -1817,9 +1832,10 @@
           state.seeded = false;
           saveState();
           releaseSelection(rentAmount);
-          if (els.rentDialog.open) renderRentMenu();
+          if (rentExpanded) renderRentMenu();
         });
         els.incomeBody.appendChild(tr);
+        if (rentExpanded) appendRentDetail();
         return;
       }
       if (isBrokerLabel(row.label)) {
@@ -2157,7 +2173,6 @@
     { id: "deposit", name: "Вклад" },
     { id: "broker", name: "Брокерский счет", calc: "broker" },
     { id: "iis", name: "ИИС" },
-    { id: "iis3", name: "ИИС 3" },
     { id: "flat1", name: "Квартира 1", calc: "flat1" },
     { id: "flat2", name: "Квартира 2", calc: "flat2" },
     { id: "garage", name: "Гараж", calc: "garage" },
@@ -2198,7 +2213,6 @@
         deposit: { "2026-01": 30640, "2026-02": 20963, "2026-03": 32708, "2026-04": 24695 },
         broker: { "2026-01": 5461, "2026-02": 4169, "2026-03": 6377.04, "2026-05": 32205.73, "2026-06": 36835.8, "2026-07": 37503, "2026-08": 42123, "2026-09": 39944.3, "2026-10": 56306.7 },
         iis: {},
-        iis3: {},
         flat1: { "2026-01": 19000, "2026-02": 19500, "2026-03": 19500, "2026-04": 19500, "2026-05": 21338, "2026-06": 20748, "2026-07": 20100, "2026-08": 20414, "2026-09": 20484, "2026-10": 21667 },
         flat2: { "2026-01": 25000, "2026-02": 25000, "2026-03": 25000, "2026-04": 25000, "2026-05": 28451, "2026-06": 28500, "2026-07": 30000, "2026-08": 26595, "2026-09": 3651, "2026-10": 0 },
         garage: { "2026-01": 16500, "2026-02": 16500, "2026-03": 16500, "2026-04": 6500, "2026-05": 16500, "2026-06": 16500, "2026-07": 16500, "2026-08": 16500, "2026-09": 16500, "2026-10": 16500 },
@@ -2222,6 +2236,10 @@
       target.savingsFact.lines = savingsLineTemplate();
       changed = true;
     }
+    if (target.savingsFact.rows.iis3) {
+      delete target.savingsFact.rows.iis3;
+      changed = true;
+    }
     const arranged = arrangeSavingsLines(target.savingsFact.lines);
     if (JSON.stringify(arranged) !== JSON.stringify(target.savingsFact.lines)) {
       target.savingsFact.lines = arranged;
@@ -2231,10 +2249,10 @@
   }
 
   function arrangeSavingsLines(lines) {
-    const hidden = new Set(["capitalPlan", "capitalFact"]);
+    const hidden = new Set(["capitalPlan", "capitalFact", "iis3"]);
     const tailIds = ["earned", "topup", "delta"];
     const byId = Object.fromEntries(lines.map((row) => [row.id, row]));
-    const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id));
+    const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id) && String(row.name || "").trim() !== "ИИС 3");
     const own = rest.find((row) => row.id === "own");
     if (own) own.calc = "own";
     const broker = rest.find((row) => row.id === "broker");
@@ -3400,7 +3418,7 @@
 
   function render() {
     if (syncBrokerIncomeRows()) saveState();
-    if (els.rentDialog?.open && rentMenuKey && rentMenuKey !== state.currentMonth) closeRentMenu();
+    if (rentExpanded) rentMenuKey = state.currentMonth;
     const month = activeMonth();
     const key = `${state.year}|${state.currentMonth}`;
     const switched = paintedKey != null && paintedKey !== key;
@@ -3615,16 +3633,6 @@
   els.settingsDialog.addEventListener("close", syncDialogScrollLock);
   els.settingsDialog.addEventListener("click", (e) => {
     if (e.target === els.settingsDialog) closeSettings();
-  });
-  document.getElementById("rentDialogClose").addEventListener("click", closeRentMenu);
-  els.rentAdd.addEventListener("click", () => addRentLine(rentMenuKey || state.currentMonth));
-  els.rentDialog.addEventListener("cancel", (e) => {
-    e.preventDefault();
-    closeRentMenu();
-  });
-  els.rentDialog.addEventListener("close", syncDialogScrollLock);
-  els.rentDialog.addEventListener("click", (e) => {
-    if (e.target === els.rentDialog) closeRentMenu();
   });
   els.importFile.addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];

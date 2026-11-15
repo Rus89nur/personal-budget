@@ -1426,8 +1426,24 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   }
 }
 
-.rent-dialog {
-  max-width: min(480px, calc(100vw - 1.5rem));
+.rent-detail td {
+  padding-top: 0.15rem;
+  padding-bottom: 0.85rem;
+}
+
+.rent-detail-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.rent-detail-note {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .rent-list {
