@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.28.2";
+  const APP_VERSION = "1.28.3";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -2682,20 +2682,33 @@
     return `<input class="name-input" type="text" value="${escapeAttr(row.name)}" data-field="name" />`;
   }
 
+  function savingsSettleMark(id, monthKey, value) {
+    const settled = value != null && savingsIsSettled(id, monthKey);
+    return {
+      cls: settled ? " is-settled" : "",
+      title: value == null ? "" : ` title="${escapeAttr(settledTitle(settled))}"`,
+      data: ` data-settle="1" data-row="${escapeAttr(id)}" data-month="${escapeAttr(monthKey)}"`,
+    };
+  }
+
   function savingsCell(row, monthKey, editable) {
     if (row.id === "own") {
       const value = ownAmount(monthKey);
       const shown = value == null ? "" : formatEditable(value);
-      const title = ` title="${escapeAttr(ownIsManual(monthKey) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить")}"`;
+      const mark = savingsSettleMark("own", monthKey, value);
+      const hint = savingsIsSettled("own", monthKey)
+        ? mark.title
+        : ` title="${escapeAttr(ownIsManual(monthKey) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить")}"`;
       if (!editable) {
-        return `<input class="num-input" type="text" readonly data-own="1" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}"${title} />`;
+        return `<input class="num-input${mark.cls}" type="text" readonly data-own="1"${mark.data} value="${escapeAttr(shown)}"${hint} />`;
       }
-      return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-own="1" data-settle="1" data-row="own" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
+      return `<input class="num-input${mark.cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-own="1"${mark.data} value="${escapeAttr(shown)}" placeholder="—"${hint} autocomplete="off" autocorrect="off" spellcheck="false" />`;
     }
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
     if (row.calc) {
-      return `<input class="num-input" type="text" readonly data-calc="${escapeAttr(row.id)}" data-month="${escapeAttr(monthKey)}" value="${escapeAttr(shown)}" placeholder="—" />`;
+      const mark = savingsSettleMark(row.id, monthKey, value);
+      return `<input class="num-input${mark.cls}" type="text" readonly data-calc="${escapeAttr(row.id)}"${mark.data} value="${escapeAttr(shown)}" placeholder="—"${mark.title} />`;
     }
     if (!editable) {
       if (value == null) return readCell(shown);
@@ -2716,7 +2729,12 @@
       const key = input.dataset.month;
       const amount = ownAmount(key);
       input.value = amount == null ? "" : formatEditable(amount);
-      input.title = ownIsManual(key) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить";
+      if (amount == null) clearSavingsSettled("own", key);
+      const on = amount != null && savingsIsSettled("own", key);
+      input.classList.toggle("is-settled", on);
+      input.title = on
+        ? settledTitle(true)
+        : (ownIsManual(key) ? "Своя сумма" : "Из «Отложить» без аренды и брокера. Можно изменить");
     });
   }
 
@@ -2725,6 +2743,8 @@
     document.querySelectorAll("#savingsBody input[data-calc]").forEach((input) => {
       const value = savingsValue({ id: input.dataset.calc, calc: input.dataset.calc }, input.dataset.month);
       input.value = value == null ? "" : formatEditable(value);
+      if (value == null) clearSavingsSettled(input.dataset.calc, input.dataset.month);
+      paintSettled(input, value != null && savingsIsSettled(input.dataset.calc, input.dataset.month));
     });
   }
 
@@ -2767,6 +2787,7 @@
         renderSavings();
       });
       if (row.id === "own") bindOwnInputs(tr, row);
+      bindSavingsSettle(tr);
       els.savingsBody.appendChild(tr);
       if (row.fold === "rent" && open) appendRentSavings(months);
       if (row.fold === "broker" && open) renderBrokerIncomes(months);
@@ -2809,6 +2830,21 @@
     });
   }
 
+  function bindSavingsSettle(tr) {
+    tr.querySelectorAll("input[data-settle]").forEach((input) => {
+      if (input.dataset.own === "1") return;
+      holdToSettle(input, () => {
+        const id = input.dataset.row;
+        const monthKey = input.dataset.month;
+        if (!canHoldSettle(input)) return false;
+        toggleSavingsSettled(id, monthKey);
+        paintSettled(input, savingsIsSettled(id, monthKey));
+        saveState();
+      });
+      armNoSelect(input);
+    });
+  }
+
   function appendRentSavings(months) {
     const lines = (monthByKey(state.currentMonth)?.income || []).find(isRentRow)?.lines || [];
     lines.forEach((line) => {
@@ -2825,6 +2861,7 @@
           patchRentLine(input.dataset.month, line.id, { amount: parsed || 0 });
         });
       });
+      bindSavingsSettle(tr);
       els.savingsBody.appendChild(tr);
     });
   }
@@ -2832,8 +2869,11 @@
   function rentDetailCell(line, month) {
     const value = rentLineAmount(line.id, month.key);
     const shown = value == null ? "" : formatEditable(value);
-    if (!month.editable) return readCell(shown);
-    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-rent-line="${escapeAttr(line.id)}" data-month="${escapeAttr(month.key)}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
+    const mark = savingsSettleMark(`rentline:${line.id}`, month.key, value);
+    if (!month.editable) {
+      return `<input class="num-input${mark.cls}" type="text" readonly data-rent-line="${escapeAttr(line.id)}"${mark.data} value="${escapeAttr(shown)}" placeholder="—"${mark.title} />`;
+    }
+    return `<input class="num-input${mark.cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-rent-line="${escapeAttr(line.id)}"${mark.data} value="${escapeAttr(shown)}" placeholder="—"${mark.title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
   function renderBrokerIncomes(months) {
