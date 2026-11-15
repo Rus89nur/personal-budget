@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.21.3";
+  const APP_VERSION = "1.22.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -846,6 +846,11 @@
       copy.kind = "rent";
       copy.label = "Аренда";
       if (Array.isArray(row.lines)) copy.lines = cloneRentLines(row.lines);
+      const paidLines = {};
+      Object.entries(row.paidLines || {}).forEach(([id, on]) => {
+        if (on) paidLines[id] = true;
+      });
+      if (Object.keys(paidLines).length) copy.paidLines = paidLines;
     }
     return copy;
   }
@@ -865,7 +870,16 @@
       planManual: Boolean(source.planManual),
       shares: source.shares,
       sharesManual: source.sharesManual,
+      ...(Object.keys(settledCopy(source)).length ? { settled: settledCopy(source) } : {}),
     };
+  }
+
+  function settledCopy(source) {
+    const settled = {};
+    Object.entries(source.settled || {}).forEach(([key, on]) => {
+      if (on && cellValue(source, key) != null) settled[key] = true;
+    });
+    return settled;
   }
 
   function copyMonthState(src) {
@@ -1070,6 +1084,36 @@
     renderRentMenu();
   }
 
+  function rentPayableLines(row) {
+    return (row.lines || []).filter((line) => line.active !== false && Number(line.amount));
+  }
+
+  function rentIsPaid(row) {
+    const lines = rentPayableLines(row);
+    return lines.length > 0 && lines.every((line) => row.paidLines?.[line.id]);
+  }
+
+  function toggleRentPaid(row) {
+    const lines = rentPayableLines(row);
+    if (!lines.length) return false;
+    const on = !rentIsPaid(row);
+    if (!row.paidLines) row.paidLines = {};
+    lines.forEach((line) => {
+      if (on) row.paidLines[line.id] = true;
+      else delete row.paidLines[line.id];
+    });
+    return true;
+  }
+
+  function toggleRentLinePaid(row, lineId) {
+    const line = (row.lines || []).find((item) => item.id === lineId);
+    if (!line || line.active === false || !Number(line.amount)) return false;
+    if (!row.paidLines) row.paidLines = {};
+    if (row.paidLines[lineId]) delete row.paidLines[lineId];
+    else row.paidLines[lineId] = true;
+    return true;
+  }
+
   function renderRentMenu() {
     const key = rentMenuKey || state.currentMonth;
     const month = monthByKey(key);
@@ -1082,13 +1126,23 @@
       item.innerHTML = `
         <input type="checkbox" aria-label="Учитывать в доходе" ${line.active ? "checked" : ""} />
         <input class="name-input" type="text" value="${escapeAttr(line.label)}" aria-label="Название" autocomplete="off" />
-        <input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${formatEditable(line.amount)}" aria-label="Сумма" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <input class="num-input${row.paidLines?.[line.id] ? " is-settled" : ""}" type="text" inputmode="decimal" enterkeyhint="done" value="${formatEditable(line.amount)}" aria-label="Сумма" title="${escapeAttr(Number(line.amount) ? settledTitle(Boolean(row.paidLines?.[line.id])) : "Сумма")}" autocomplete="off" autocorrect="off" spellcheck="false" />
         <button type="button" class="icon-x" aria-label="Удалить строку">×</button>
       `;
       const [check, name, amount, remove] = item.children;
       check.addEventListener("change", () => patchRentLine(key, line.id, { active: check.checked }));
       name.addEventListener("change", () => patchRentLine(key, line.id, { label: name.value }));
       amount.addEventListener("change", () => patchRentLine(key, line.id, { amount: parseNumber(amount.value) || 0 }));
+      amount.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        const current = monthByKey(key)?.income?.find(isRentRow);
+        if (!current || !toggleRentLinePaid(current, line.id)) return;
+        state.seeded = false;
+        saveState();
+        renderRentMenu();
+        paintRentRow();
+        renderIncome(monthByKey(state.currentMonth));
+      });
       remove.addEventListener("click", () => removeRentLine(key, line.id));
       els.rentList.appendChild(item);
     });
@@ -1675,11 +1729,29 @@
             <input class="name-input" type="text" value="Аренда" data-act="rent" readonly title="Нажмите, чтобы изменить" />
             <span class="rent-hint">Нажмите, чтобы изменить</span>
           </td>
-          <td class="num"><input class="num-input" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="Нажмите, чтобы изменить" /></td>
+          <td class="num"><input class="num-input${rentIsPaid(row) ? " is-settled" : ""}" type="text" inputmode="decimal" value="${formatEditable(row.amount)}" data-rent-amount readonly title="${escapeAttr(rentIsPaid(row) ? "Квартплата внесена. Двойное нажатие снимет отметку" : "Нажмите, чтобы изменить. Двойное нажатие отмечает, что квартплата внесена")}" /></td>
           <td class="actions-col"></td>
         `;
         tr.querySelector("[data-act=rent]").addEventListener("click", openRentMenu);
-        tr.querySelector("[data-rent-amount]").addEventListener("click", openRentMenu);
+        const rentAmount = tr.querySelector("[data-rent-amount]");
+        let rentOpenTimer = 0;
+        rentAmount.addEventListener("click", (event) => {
+          if (event.detail > 1) return;
+          clearTimeout(rentOpenTimer);
+          rentOpenTimer = setTimeout(openRentMenu, 240);
+        });
+        rentAmount.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          clearTimeout(rentOpenTimer);
+          if (!toggleRentPaid(row)) return;
+          paintSettled(rentAmount, rentIsPaid(row));
+          rentAmount.title = rentIsPaid(row)
+            ? "Квартплата внесена. Двойное нажатие снимет отметку"
+            : "Нажмите, чтобы изменить. Двойное нажатие отмечает, что квартплата внесена";
+          state.seeded = false;
+          saveState();
+          if (els.rentDialog.open) renderRentMenu();
+        });
         els.incomeBody.appendChild(tr);
         return;
       }
@@ -1718,7 +1790,32 @@
   function shareInput(row, key) {
     const value = cellValue(row, key);
     const shown = value == null ? "" : formatEditable(value);
-    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}" autocomplete="off" autocorrect="off" spellcheck="false" />`;
+    const settled = expenseSettled(row, key);
+    const title = value == null ? "" : ` title="${escapeAttr(settledTitle(settled))}"`;
+    return `<input class="num-input${settled ? " is-settled" : ""}" type="text" inputmode="decimal" enterkeyhint="done" value="${shown}" placeholder="—" data-key="${escapeAttr(key)}"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
+  }
+
+  function settledTitle(on) {
+    return on
+      ? "Внесено. Двойное нажатие снимет отметку"
+      : "Двойное нажатие отмечает, что сумма уже внесена";
+  }
+
+  function expenseSettled(row, key) {
+    return cellValue(row, key) != null && Boolean(row.settled?.[key]);
+  }
+
+  function toggleExpenseSettled(row, key) {
+    if (cellValue(row, key) == null) return false;
+    if (!row.settled) row.settled = {};
+    if (row.settled[key]) delete row.settled[key];
+    else row.settled[key] = true;
+    return true;
+  }
+
+  function paintSettled(input, on) {
+    input.classList.toggle("is-settled", on);
+    input.title = settledTitle(on);
   }
 
   function writeExpenseCell(row, key, parsed) {
@@ -1730,6 +1827,7 @@
       else row.shares[key] = parsed;
       row.sharesManual[key] = parsed != null;
     }
+    if (parsed == null && row.settled) delete row.settled[key];
   }
 
   function expenseColumnKeys(month) {
@@ -1762,6 +1860,7 @@
       normalizeExpense(row);
       writeExpenseCell(row, "plan", null);
       Object.keys(row.shares || {}).forEach((key) => writeExpenseCell(row, key, null));
+      row.settled = {};
     });
     state.seeded = false;
     saveState();
@@ -1840,10 +1939,21 @@
           input.value = stored == null ? "" : formatEditable(stored);
           input.classList.remove("is-suggestion");
           delete input.dataset.pending;
+          paintSettled(input, expenseSettled(row, key));
+          if (stored == null) input.removeAttribute("title");
           state.seeded = false;
           saveState();
           refreshTotalsOnly();
         };
+
+        input.addEventListener("dblclick", (event) => {
+          if (!toggleExpenseSettled(row, key)) return;
+          event.preventDefault();
+          paintSettled(input, expenseSettled(row, key));
+          state.seeded = false;
+          saveState();
+          selectField(input);
+        });
 
         input.addEventListener("focus", () => {
           if (cellValue(row, key) != null) return;
@@ -1892,6 +2002,8 @@
           const stored = parsed == null || parsed === 0 ? null : parsed;
           if (stored === cellValue(row, key)) {
             input.value = stored == null ? "" : formatEditable(stored);
+            paintSettled(input, expenseSettled(row, key));
+            if (stored == null) input.removeAttribute("title");
             return;
           }
           commitCell(stored);
@@ -2176,6 +2288,36 @@
     return `<input class="name-input" type="text" readonly value="${escapeAttr(label)}" />`;
   }
 
+  function savingsIsSettled(id, monthKey) {
+    return Boolean(state.savingsFact?.settled?.[id]?.[monthKey]);
+  }
+
+  function toggleSavingsSettled(id, monthKey) {
+    if (!state.savingsFact.settled) state.savingsFact.settled = {};
+    if (!state.savingsFact.settled[id]) state.savingsFact.settled[id] = {};
+    if (state.savingsFact.settled[id][monthKey]) delete state.savingsFact.settled[id][monthKey];
+    else state.savingsFact.settled[id][monthKey] = true;
+  }
+
+  function clearSavingsSettled(id, monthKey) {
+    if (state.savingsFact?.settled?.[id]) delete state.savingsFact.settled[id][monthKey];
+  }
+
+  function brokerIsSettled(id, monthKey) {
+    return Boolean(state.savingsFact?.brokerSettled?.[id]?.[monthKey]);
+  }
+
+  function toggleBrokerSettled(id, monthKey) {
+    if (!state.savingsFact.brokerSettled) state.savingsFact.brokerSettled = {};
+    if (!state.savingsFact.brokerSettled[id]) state.savingsFact.brokerSettled[id] = {};
+    if (state.savingsFact.brokerSettled[id][monthKey]) delete state.savingsFact.brokerSettled[id][monthKey];
+    else state.savingsFact.brokerSettled[id][monthKey] = true;
+  }
+
+  function clearBrokerSettled(id, monthKey) {
+    if (state.savingsFact?.brokerSettled?.[id]) delete state.savingsFact.brokerSettled[id][monthKey];
+  }
+
   function savingsValue(row, monthKey) {
     return row.calc ? savingsCalc(row.calc, monthKey) : savingsStored(row.id, monthKey);
   }
@@ -2194,8 +2336,14 @@
   function savingsCell(row, monthKey, editable) {
     const value = savingsValue(row, monthKey);
     const shown = value == null ? "" : formatEditable(value);
-    if (row.calc || !editable) return readCell(shown);
-    return `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`;
+    if (row.calc || value == null) return readCell(shown);
+    const settled = savingsIsSettled(row.id, monthKey);
+    const title = ` title="${escapeAttr(settledTitle(settled))}"`;
+    const cls = settled ? " is-settled" : "";
+    if (!editable) {
+      return `<input class="num-input${cls}" type="text" readonly data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}"${title} />`;
+    }
+    return `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-row="${row.id}" data-month="${monthKey}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`;
   }
 
   function renderSavings() {
@@ -2235,8 +2383,10 @@
           const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
           if (!state.savingsFact.rows[row.id]) state.savingsFact.rows[row.id] = {};
-          if (parsed == null) delete state.savingsFact.rows[row.id][monthKey];
-          else state.savingsFact.rows[row.id][monthKey] = parsed;
+          if (parsed == null) {
+            delete state.savingsFact.rows[row.id][monthKey];
+            clearSavingsSettled(row.id, monthKey);
+          } else state.savingsFact.rows[row.id][monthKey] = parsed;
           saveState();
           renderSavings();
         });
@@ -2244,10 +2394,22 @@
       tr.querySelector("[data-act='del']")?.addEventListener("click", () => {
         state.savingsFact.lines = savingsLines().filter((item) => item.id !== row.id);
         delete state.savingsFact.rows[row.id];
+        if (state.savingsFact.settled) delete state.savingsFact.settled[row.id];
         saveState();
         renderSavings();
       });
       els.savingsBody.appendChild(tr);
+      tr.querySelectorAll("input[data-settle]").forEach((input) => {
+        input.addEventListener("dblclick", (event) => {
+          const monthKey = input.dataset.month;
+          if (savingsValue(row, monthKey) == null) return;
+          event.preventDefault();
+          toggleSavingsSettled(row.id, monthKey);
+          paintSettled(input, savingsIsSettled(row.id, monthKey));
+          saveState();
+          selectField(input);
+        });
+      });
     });
     renderBrokerIncomes(months);
   }
@@ -2271,9 +2433,14 @@
         ${months.map((month, index) => {
           const value = row.amounts[month.key];
           const shown = value == null || value === "" ? "" : formatEditable(Number(value));
-          const cell = month.editable
-            ? `<input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—" autocomplete="off" autocorrect="off" spellcheck="false" />`
-            : readCell(shown);
+          const settled = shown !== "" && brokerIsSettled(row.id, month.key);
+          const title = shown === "" ? "" : ` title="${escapeAttr(settledTitle(settled))}"`;
+          const cls = settled ? " is-settled" : "";
+          const cell = shown === ""
+            ? readCell(shown)
+            : month.editable
+              ? `<input class="num-input${cls}" type="text" inputmode="decimal" enterkeyhint="done" data-blank="1" data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}" placeholder="—"${title} autocomplete="off" autocorrect="off" spellcheck="false" />`
+              : `<input class="num-input${cls}" type="text" readonly data-settle="1" data-month="${month.key}" value="${escapeAttr(shown)}"${title} />`;
           return `<td class="num${index === months.length - 2 ? " plan-col" : ""}${month.editable ? " is-entry" : ""}">${cell}</td>`;
         }).join("")}
         <td class="actions-col"><button type="button" class="icon-x" aria-label="Удалить" data-act="del">×</button></td>
@@ -2286,18 +2453,33 @@
         input.addEventListener("change", () => {
           const monthKey = input.dataset.month;
           const parsed = parseNumber(input.value);
-          if (parsed == null) delete row.amounts[monthKey];
-          else row.amounts[monthKey] = parsed;
+          if (parsed == null) {
+            delete row.amounts[monthKey];
+            clearBrokerSettled(row.id, monthKey);
+          } else row.amounts[monthKey] = parsed;
           saveState();
           renderSavings();
         });
       });
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
         state.savingsFact.brokerIncomes = rows.filter((item) => item.id !== row.id);
+        if (state.savingsFact.brokerSettled) delete state.savingsFact.brokerSettled[row.id];
         saveState();
         renderSavings();
       });
       els.brokerIncomeBody.appendChild(tr);
+      tr.querySelectorAll("input[data-settle]").forEach((input) => {
+        input.addEventListener("dblclick", (event) => {
+          const monthKey = input.dataset.month;
+          const value = row.amounts[monthKey];
+          if (value == null || value === "") return;
+          event.preventDefault();
+          toggleBrokerSettled(row.id, monthKey);
+          paintSettled(input, brokerIsSettled(row.id, monthKey));
+          saveState();
+          selectField(input);
+        });
+      });
     });
   }
 

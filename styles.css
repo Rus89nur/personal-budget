@@ -1082,6 +1082,15 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
   outline: none;
 }
 
+.data-table input.is-settled:not([type="checkbox"]):not([type="radio"]),
+.data-table input.is-settled:not([type="checkbox"]):not([type="radio"]):hover,
+.data-table input.is-settled:not([type="checkbox"]):not([type="radio"]):focus,
+.rent-line input.num-input.is-settled,
+.rent-line input.num-input.is-settled:hover,
+.rent-line input.num-input.is-settled:focus {
+  background: rgba(29, 107, 69, 0.14);
+}
+
 .expense-panel .data-table input::placeholder {
   color: rgba(28, 27, 25, 0.38);
 }
