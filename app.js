@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.24.0";
+  const APP_VERSION = "1.25.0";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -425,7 +425,8 @@
         if (row.kind === "rent") return (row.lines || []).some((line) => Number(line.amount));
         if (row.manual && Number(row.amount)) return true;
         const payroll = isSalaryLabel(row.label) || isAdvanceLabel(row.label) || isVacationLabel(row.label);
-        return !payroll && Number(row.amount);
+        if (payroll || isBrokerLabel(row.label)) return false;
+        return Number(row.amount);
       });
       if (incomeFilled) return true;
       return (month?.expenses || []).some((row) => {
@@ -754,6 +755,10 @@
 
   function isKvLabel(label) {
     return /^кв$/i.test(String(label || "").trim());
+  }
+
+  function isBrokerLabel(label) {
+    return /^брокер$/i.test(String(label || "").trim());
   }
 
   function dropKvFromDecember(target) {
@@ -1781,6 +1786,20 @@
         els.incomeBody.appendChild(tr);
         return;
       }
+      if (isBrokerLabel(row.label)) {
+        const sum = brokerIncomeSum(state.currentMonth);
+        row.amount = sum || 0;
+        row.derived = "broker";
+        delete row.manual;
+        tr.classList.add("payroll-derived");
+        tr.innerHTML = `
+          <td><input class="name-input" type="text" value="Брокер" readonly /></td>
+          <td class="num"><input class="num-input" type="text" readonly data-broker="1" data-blank="1" value="${sum == null ? "" : formatEditable(sum)}" placeholder="—" title="Сумма доходов брокерского счёта" /></td>
+          <td class="actions-col"></td>
+        `;
+        els.incomeBody.appendChild(tr);
+        return;
+      }
       tr.innerHTML = `
         <td><input class="name-input" type="text" value="${escapeAttr(row.label)}" data-field="label" ${payroll ? "readonly" : ""} /></td>
         <td class="num"><input class="num-input" type="text" inputmode="decimal" enterkeyhint="done" value="${formatEditable(row.amount)}" data-field="amount" title="${payroll ? "Можно поправить вручную" : ""}" autocomplete="off" autocorrect="off" spellcheck="false" /></td>
@@ -2182,6 +2201,8 @@
     const rest = lines.filter((row) => !hidden.has(row.id) && !tailIds.includes(row.id));
     const own = rest.find((row) => row.id === "own");
     if (own) own.calc = "own";
+    const broker = rest.find((row) => row.id === "broker");
+    if (broker) broker.calc = "broker";
     rest.forEach((row) => {
       if (row.id === "flat1" || row.id === "flat2" || row.id === "garage") row.calc = row.id;
     });
@@ -2222,6 +2243,36 @@
     });
     if (!parts.length) return null;
     return savingsRound(parts.reduce((sum, value) => sum + value, 0));
+  }
+
+  function syncBrokerIncomeRows() {
+    let changed = false;
+    YEARS.forEach((year) => {
+      Object.entries(state.years?.[year]?.months || {}).forEach(([key, month]) => {
+        (month.income || []).forEach((row) => {
+          if (!isBrokerLabel(row.label)) return;
+          const amount = brokerIncomeSum(key) || 0;
+          if (Number(row.amount) !== amount || row.derived !== "broker" || row.manual) {
+            row.amount = amount;
+            row.derived = "broker";
+            delete row.manual;
+            changed = true;
+          }
+        });
+      });
+    });
+    return changed;
+  }
+
+  function refreshBrokerSurfaces() {
+    paintSavingsCalcs();
+    const input = document.querySelector("#incomeBody input[data-broker]");
+    if (input) {
+      const sum = brokerIncomeSum(state.currentMonth);
+      input.value = sum == null ? "" : formatEditable(sum);
+    }
+    refreshTotalsOnly();
+    renderAnalytics();
   }
 
   function savingsEarned(key) {
@@ -2605,18 +2656,21 @@
             delete row.amounts[monthKey];
             clearBrokerSettled(row.id, monthKey);
           } else row.amounts[monthKey] = parsed;
+          syncBrokerIncomeRows();
           saveState();
           input.value = parsed == null ? "" : formatEditable(parsed);
           input.classList.remove("is-settled");
           input.removeAttribute("title");
-          paintSavingsCalcs();
+          refreshBrokerSurfaces();
         });
       });
       tr.querySelector('[data-act="del"]').addEventListener("click", () => {
         state.savingsFact.brokerIncomes = rows.filter((item) => item.id !== row.id);
         if (state.savingsFact.brokerSettled) delete state.savingsFact.brokerSettled[row.id];
+        syncBrokerIncomeRows();
         saveState();
         renderSavings();
+        refreshBrokerSurfaces();
       });
       els.brokerIncomeBody.appendChild(tr);
       tr.querySelectorAll("input[data-settle]").forEach((input) => {
@@ -3309,6 +3363,7 @@
   }
 
   function render() {
+    if (syncBrokerIncomeRows()) saveState();
     if (els.rentDialog?.open && rentMenuKey && rentMenuKey !== state.currentMonth) closeRentMenu();
     const month = activeMonth();
     const key = `${state.year}|${state.currentMonth}`;
