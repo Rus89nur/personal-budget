@@ -1404,10 +1404,12 @@ body:has(#navToggle:checked) .nav-action:nth-child(4) { animation-delay: 0.18s; 
 }
 
 .savings-panel .data-table tbody tr.savings-rule td {
-  height: 1px;
+  height: 3px;
   padding: 0;
   border: 0;
-  background: linear-gradient(90deg, transparent, rgba(106, 86, 68, 0.55) 12%, rgba(106, 86, 68, 0.55) 88%, transparent);
+  background: linear-gradient(to right, transparent, rgba(28, 27, 25, 0.2) 8%, rgba(28, 27, 25, 0.2) 92%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 42%, #000 58%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 42%, #000 58%, transparent);
 }
 
 .savings-detail .savings-detail-label,
