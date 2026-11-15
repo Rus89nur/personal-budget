@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.25.0";
+  const APP_VERSION = "1.25.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -985,6 +985,42 @@
         if (before !== JSON.stringify(row.lines)) changed = true;
       });
     });
+    return changed;
+  }
+
+  const RENT_SAVINGS_LINES = [
+    ["rent_gaz", "flat1"],
+    ["rent_quiet", "flat2"],
+    ["rent_garage", "garage"],
+  ];
+
+  function backfillRentFromSavings(target) {
+    if (target.rentFilledFromSavings) return false;
+    const saved = target.savingsFact?.rows;
+    if (!saved) return false;
+    let changed = false;
+    YEARS.forEach((year) => {
+      monthKeys(year).forEach((key) => {
+        const month = target.years?.[year]?.months?.[key];
+        if (!month) return;
+        const row = ensureRentRow(month, target.rentDefaults);
+        let monthChanged = false;
+        RENT_SAVINGS_LINES.forEach(([lineId, savingsId]) => {
+          const stored = Number(saved[savingsId]?.[key]);
+          if (!Number.isFinite(stored) || stored === 0) return;
+          const line = row.lines.find((item) => item.id === lineId);
+          if (!line || Number(line.amount)) return;
+          line.amount = stored;
+          line.active = true;
+          monthChanged = true;
+        });
+        if (monthChanged) {
+          syncRentRow(row);
+          changed = true;
+        }
+      });
+    });
+    target.rentFilledFromSavings = true;
     return changed;
   }
 
@@ -3665,7 +3701,8 @@
     });
     const savingsReady = ensureSavingsFact(state);
     const savingsApplied = applySheetSavings(state, sheetSavings);
-    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || savingsReady || savingsApplied || ensureUtilities(state)) saveState();
+    const rentBackfill = backfillRentFromSavings(state);
+    if (droppedVacation || ensureRentStructure(state) || dropKvFromDecember(state) || blankExpenseZeros(state) || ensureTitheStructure(state) || applySheetNovemberCosts(state) || applySheetBudget(state, sheetBudget) || savingsReady || savingsApplied || rentBackfill || ensureUtilities(state)) saveState();
     render();
   }
 
