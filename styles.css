@@ -1028,7 +1028,8 @@ body:has(#navToggle:checked) .theme-switch {
   min-width: 6.2rem;
 }
 
-.data-table input.num-input.is-holding {
+.data-table input.num-input.is-holding,
+.data-table input.num-input[data-settle] {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;

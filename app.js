@@ -1,5 +1,5 @@
 (() => {
-  const APP_VERSION = "1.30.0";
+  const APP_VERSION = "1.30.1";
   const STORAGE_KEY = "personal-budget-v2";
   const YEARS = [2026, 2027];
   const Salary = window.BudgetSalary;
@@ -1507,11 +1507,6 @@
       timer = 0;
       input.classList.remove("is-holding");
     };
-
-    input.addEventListener("touchstart", (event) => {
-      if (!canHoldSettle(input) || event.touches.length !== 1) return;
-      event.preventDefault();
-    }, { passive: false });
 
     input.addEventListener("pointerdown", (event) => {
       if (event.button != null && event.button !== 0) return;
